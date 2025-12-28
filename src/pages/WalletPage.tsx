@@ -361,6 +361,7 @@ export default function WalletPage() {
                         <li>转账完成后，在下方输入实际支付金额</li>
                         <li>点击"确认激活"按钮</li>
                         <li>等待管理员确认后，钱包即可激活</li>
+                        <li>支付的激活费用30 USDT去掉手续费后，可以返还HTP和USDT代币到您当前支付的地址。每一次交易都要扣除手续费，此手续费由币安链（BSC）收取</li>
                       </ol>
                     </AlertDescription>
                   </Alert>
