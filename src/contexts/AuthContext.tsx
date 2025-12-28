@@ -21,7 +21,7 @@ interface AuthContextType {
   profile: Profile | null;
   loading: boolean;
   signIn: (username: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (username: string, password: string) => Promise<{ error: Error | null }>;
+  signUp: (username: string, password: string, invitationCode?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -64,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signInWithUsername = async (username: string, password: string) => {
+  const signIn = async (username: string, password: string) => {
     try {
       const email = `${username}@miaoda.com`;
       const { error } = await supabase.auth.signInWithPassword({
@@ -79,15 +79,76 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signUpWithUsername = async (username: string, password: string) => {
+  const signUp = async (username: string, password: string, invitationCode?: string) => {
     try {
       const email = `${username}@miaoda.com`;
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            username,
+            invitation_code: invitationCode || null,
+          },
+        },
       });
 
       if (error) throw error;
+
+      // 如果有邀请码，处理邀请关系
+      if (invitationCode && data.user) {
+        // 查找邀请人
+        const { data: inviter } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('invitation_code', invitationCode)
+          .maybeSingle();
+
+        if (inviter) {
+          // 等待新用户profile创建后再创建邀请关系
+          setTimeout(async () => {
+            await supabase.from('invitations').insert({
+              inviter_id: inviter.id,
+              invitee_id: data.user!.id,
+              reward_amount: 10,
+            });
+
+            // 更新邀请人余额和邀请数
+            const { data: inviterProfile } = await supabase
+              .from('profiles')
+              .select('htp_balance, total_invites')
+              .eq('id', inviter.id)
+              .maybeSingle();
+
+            if (inviterProfile) {
+              await supabase
+                .from('profiles')
+                .update({
+                  htp_balance: inviterProfile.htp_balance + 10,
+                  total_invites: inviterProfile.total_invites + 1,
+                })
+                .eq('id', inviter.id);
+
+              // 创建交易记录
+              await supabase.from('transactions').insert({
+                user_id: inviter.id,
+                type: 'invitation_reward',
+                amount: 10,
+                token_type: 'HTP',
+                status: 'completed',
+                description: '邀请奖励',
+              });
+            }
+
+            // 更新被邀请人的invited_by字段
+            await supabase
+              .from('profiles')
+              .update({ invited_by: inviter.id })
+              .eq('id', data.user!.id);
+          }, 2000);
+        }
+      }
+
       return { error: null };
     } catch (error) {
       return { error: error as Error };
@@ -101,7 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signInWithUsername, signUpWithUsername, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, profile, loading, signIn, signUp, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

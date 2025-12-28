@@ -1,0 +1,512 @@
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
+import { Shield, Users, FileCheck, Network, Loader2 } from 'lucide-react';
+import {
+  getAllProfiles,
+  updateUserRole,
+  getAllWithdrawalRequests,
+  reviewWithdrawalRequest,
+  getAllMasterNodeApplications,
+} from '@/db/api';
+import type { Profile, WithdrawalRequest, MasterNodeApplication } from '@/types/types';
+
+export default function AdminPage() {
+  const [users, setUsers] = useState<Profile[]>([]);
+  const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
+  const [masterNodes, setMasterNodes] = useState<MasterNodeApplication[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [reviewDialog, setReviewDialog] = useState<{
+    open: boolean;
+    type: 'withdrawal' | 'masternode' | null;
+    id: string | null;
+    action: 'approve' | 'reject' | null;
+  }>({ open: false, type: null, id: null, action: null });
+  const [rejectReason, setRejectReason] = useState('');
+  const [processing, setProcessing] = useState(false);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    const [usersData, withdrawalsData, masterNodesData] = await Promise.all([
+      getAllProfiles(),
+      getAllWithdrawalRequests(),
+      getAllMasterNodeApplications(),
+    ]);
+    setUsers(usersData);
+    setWithdrawals(withdrawalsData);
+    setMasterNodes(masterNodesData);
+    setLoading(false);
+  };
+
+  const handleRoleChange = async (userId: string, newRole: 'user' | 'admin' | 'master_node') => {
+    const success = await updateUserRole(userId, newRole);
+    if (success) {
+      toast.success('角色更新成功');
+      await loadData();
+    } else {
+      toast.error('角色更新失败');
+    }
+  };
+
+  const handleReview = async () => {
+    if (!reviewDialog.id || !reviewDialog.action) return;
+
+    if (reviewDialog.action === 'reject' && !rejectReason.trim()) {
+      toast.error('请填写拒绝原因');
+      return;
+    }
+
+    setProcessing(true);
+
+    if (reviewDialog.type === 'withdrawal') {
+      const success = await reviewWithdrawalRequest(
+        reviewDialog.id,
+        reviewDialog.action === 'approve' ? 'approved' : 'rejected',
+        reviewDialog.action === 'reject' ? rejectReason : undefined
+      );
+
+      if (success) {
+        toast.success(reviewDialog.action === 'approve' ? '提币申请已通过' : '提币申请已拒绝');
+        await loadData();
+        setReviewDialog({ open: false, type: null, id: null, action: null });
+        setRejectReason('');
+      } else {
+        toast.error('操作失败');
+      }
+    }
+
+    setProcessing(false);
+  };
+
+  const pendingWithdrawals = withdrawals.filter(w => w.status === 'pending');
+  const pendingMasterNodes = masterNodes.filter(m => m.status === 'pending');
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold gradient-text flex items-center gap-2">
+          <Shield className="w-8 h-8" />
+          管理后台
+        </h1>
+        <p className="text-muted-foreground mt-2">管理用户、审核申请和查看统计数据</p>
+      </div>
+
+      {/* 统计卡片 */}
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card className="glow-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              总用户数
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{users.length}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="glow-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <FileCheck className="w-4 h-4" />
+              待审核提币
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-500">{pendingWithdrawals.length}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="glow-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Network className="w-4 h-4" />
+              待审核主节点
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-500">{pendingMasterNodes.length}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="glow-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">主节点数量</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-primary">
+              {users.filter(u => u.is_master_node).length}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 管理标签页 */}
+      <Tabs defaultValue="users" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="users">用户管理</TabsTrigger>
+          <TabsTrigger value="withdrawals">
+            提币审核
+            {pendingWithdrawals.length > 0 && (
+              <Badge variant="destructive" className="ml-2">{pendingWithdrawals.length}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="masternodes">
+            主节点审核
+            {pendingMasterNodes.length > 0 && (
+              <Badge variant="destructive" className="ml-2">{pendingMasterNodes.length}</Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        {/* 用户管理 */}
+        <TabsContent value="users">
+          <Card>
+            <CardHeader>
+              <CardTitle>用户列表</CardTitle>
+              <CardDescription>管理所有用户的角色和权限</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>用户名</TableHead>
+                        <TableHead>HTP余额</TableHead>
+                        <TableHead>USDT余额</TableHead>
+                        <TableHead>邀请人数</TableHead>
+                        <TableHead>注册时间</TableHead>
+                        <TableHead>角色</TableHead>
+                        <TableHead className="text-right">操作</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {users.map((user) => (
+                        <TableRow key={user.id}>
+                          <TableCell className="font-medium">{user.username}</TableCell>
+                          <TableCell>{user.htp_balance.toFixed(2)}</TableCell>
+                          <TableCell>{user.usdt_balance.toFixed(2)}</TableCell>
+                          <TableCell>{user.total_invites}</TableCell>
+                          <TableCell className="text-sm">
+                            {new Date(user.created_at).toLocaleDateString('zh-CN')}
+                          </TableCell>
+                          <TableCell>
+                            {user.role === 'admin' && (
+                              <Badge variant="secondary" className="bg-red-500/10 text-red-500">
+                                管理员
+                              </Badge>
+                            )}
+                            {user.role === 'master_node' && (
+                              <Badge variant="secondary" className="bg-primary/10 text-primary">
+                                主节点
+                              </Badge>
+                            )}
+                            {user.role === 'user' && (
+                              <Badge variant="secondary">普通用户</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <select
+                              value={user.role}
+                              onChange={(e) => handleRoleChange(user.id, e.target.value as typeof user.role)}
+                              className="text-sm border rounded px-2 py-1 bg-background"
+                            >
+                              <option value="user">普通用户</option>
+                              <option value="master_node">主节点</option>
+                              <option value="admin">管理员</option>
+                            </select>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* 提币审核 */}
+        <TabsContent value="withdrawals">
+          <Card>
+            <CardHeader>
+              <CardTitle>提币审核</CardTitle>
+              <CardDescription>审核用户的提币申请</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : withdrawals.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  暂无提币申请
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>用户</TableHead>
+                        <TableHead>代币</TableHead>
+                        <TableHead className="text-right">数量</TableHead>
+                        <TableHead>接收地址</TableHead>
+                        <TableHead>申请时间</TableHead>
+                        <TableHead>状态</TableHead>
+                        <TableHead className="text-right">操作</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {withdrawals.map((withdrawal) => {
+                        const user = users.find(u => u.id === withdrawal.user_id);
+                        
+                        return (
+                          <TableRow key={withdrawal.id}>
+                            <TableCell className="font-medium">
+                              {user?.username || '未知用户'}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{withdrawal.token_type}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right font-bold">
+                              {withdrawal.amount.toFixed(2)}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {withdrawal.to_address.slice(0, 10)}...
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {new Date(withdrawal.created_at).toLocaleString('zh-CN')}
+                            </TableCell>
+                            <TableCell>
+                              {withdrawal.status === 'pending' && (
+                                <Badge variant="secondary" className="bg-yellow-500/10 text-yellow-500">
+                                  待审核
+                                </Badge>
+                              )}
+                              {withdrawal.status === 'approved' && (
+                                <Badge variant="secondary" className="bg-green-500/10 text-green-500">
+                                  已通过
+                                </Badge>
+                              )}
+                              {withdrawal.status === 'rejected' && (
+                                <Badge variant="secondary" className="bg-red-500/10 text-red-500">
+                                  已拒绝
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {withdrawal.status === 'pending' && (
+                                <div className="flex gap-2 justify-end">
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    onClick={() => setReviewDialog({
+                                      open: true,
+                                      type: 'withdrawal',
+                                      id: withdrawal.id,
+                                      action: 'approve',
+                                    })}
+                                  >
+                                    通过
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => setReviewDialog({
+                                      open: true,
+                                      type: 'withdrawal',
+                                      id: withdrawal.id,
+                                      action: 'reject',
+                                    })}
+                                  >
+                                    拒绝
+                                  </Button>
+                                </div>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* 主节点审核 */}
+        <TabsContent value="masternodes">
+          <Card>
+            <CardHeader>
+              <CardTitle>主节点审核</CardTitle>
+              <CardDescription>审核用户的主节点申请</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : masterNodes.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  暂无主节点申请
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>用户</TableHead>
+                        <TableHead>申请时间</TableHead>
+                        <TableHead>目标</TableHead>
+                        <TableHead>进度</TableHead>
+                        <TableHead>状态</TableHead>
+                        <TableHead className="text-right">操作</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {masterNodes.map((application) => {
+                        const user = users.find(u => u.id === application.user_id);
+                        
+                        return (
+                          <TableRow key={application.id}>
+                            <TableCell className="font-medium">
+                              {user?.username || '未知用户'}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {new Date(application.applied_at).toLocaleString('zh-CN')}
+                            </TableCell>
+                            <TableCell>
+                              {application.target_wallets.toLocaleString()}
+                            </TableCell>
+                            <TableCell>
+                              {application.activated_wallets.toLocaleString()}
+                            </TableCell>
+                            <TableCell>
+                              {application.status === 'pending' && (
+                                <Badge variant="secondary" className="bg-yellow-500/10 text-yellow-500">
+                                  待审核
+                                </Badge>
+                              )}
+                              {application.status === 'approved' && (
+                                <Badge variant="secondary" className="bg-green-500/10 text-green-500">
+                                  已通过
+                                </Badge>
+                              )}
+                              {application.status === 'rejected' && (
+                                <Badge variant="secondary" className="bg-red-500/10 text-red-500">
+                                  已拒绝
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {application.status === 'pending' && (
+                                <div className="flex gap-2 justify-end">
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    onClick={async () => {
+                                      // 直接通过，更新用户角色
+                                      await handleRoleChange(application.user_id, 'master_node');
+                                      toast.success('主节点申请已通过');
+                                    }}
+                                  >
+                                    通过
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => setReviewDialog({
+                                      open: true,
+                                      type: 'masternode',
+                                      id: application.id,
+                                      action: 'reject',
+                                    })}
+                                  >
+                                    拒绝
+                                  </Button>
+                                </div>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* 审核对话框 */}
+      <Dialog open={reviewDialog.open} onOpenChange={(open) => {
+        if (!open) {
+          setReviewDialog({ open: false, type: null, id: null, action: null });
+          setRejectReason('');
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {reviewDialog.action === 'approve' ? '确认通过' : '确认拒绝'}
+            </DialogTitle>
+            <DialogDescription>
+              {reviewDialog.action === 'approve'
+                ? '确认通过此申请吗？'
+                : '请填写拒绝原因'}
+            </DialogDescription>
+          </DialogHeader>
+          {reviewDialog.action === 'reject' && (
+            <div className="space-y-2">
+              <Label htmlFor="reject-reason">拒绝原因</Label>
+              <Textarea
+                id="reject-reason"
+                placeholder="请输入拒绝原因..."
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                rows={4}
+              />
+            </div>
+          )}
+          <div className="flex gap-2 justify-end">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setReviewDialog({ open: false, type: null, id: null, action: null });
+                setRejectReason('');
+              }}
+            >
+              取消
+            </Button>
+            <Button
+              onClick={handleReview}
+              disabled={processing}
+              variant={reviewDialog.action === 'approve' ? 'default' : 'destructive'}
+            >
+              {processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              确认
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

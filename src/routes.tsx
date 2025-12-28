@@ -1,5 +1,16 @@
-import SamplePage from './pages/SamplePage';
+import { lazy } from 'react';
 import type { ReactNode } from 'react';
+
+// 懒加载页面组件
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const MiningPage = lazy(() => import('./pages/MiningPage'));
+const InvitationPage = lazy(() => import('./pages/InvitationPage'));
+const MasterNodePage = lazy(() => import('./pages/MasterNodePage'));
+const TransactionsPage = lazy(() => import('./pages/TransactionsPage'));
+const WalletPage = lazy(() => import('./pages/WalletPage'));
+const AdminPage = lazy(() => import('./pages/AdminPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
 
 interface RouteConfig {
   name: string;
@@ -10,10 +21,51 @@ interface RouteConfig {
 
 const routes: RouteConfig[] = [
   {
-    name: 'Sample Page',
+    name: '仪表盘',
     path: '/',
-    element: <SamplePage />
-  }
+    element: <DashboardPage />,
+  },
+  {
+    name: '挖矿记录',
+    path: '/mining',
+    element: <MiningPage />,
+  },
+  {
+    name: '邀请好友',
+    path: '/invitation',
+    element: <InvitationPage />,
+  },
+  {
+    name: '主节点',
+    path: '/master-node',
+    element: <MasterNodePage />,
+  },
+  {
+    name: '交易记录',
+    path: '/transactions',
+    element: <TransactionsPage />,
+  },
+  {
+    name: '钱包管理',
+    path: '/wallet',
+    element: <WalletPage />,
+  },
+  {
+    name: '管理后台',
+    path: '/admin',
+    element: <AdminPage />,
+  },
+  {
+    name: '设置',
+    path: '/settings',
+    element: <SettingsPage />,
+  },
+  {
+    name: '登录',
+    path: '/login',
+    element: <LoginPage />,
+    visible: false,
+  },
 ];
 
 export default routes;
