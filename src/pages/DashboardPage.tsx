@@ -96,8 +96,8 @@ export default function DashboardPage() {
             <TrendingUp className="w-4 h-4 text-chart-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-500">${calculateHTPPrice()}</div>
-            <p className="text-xs text-muted-foreground mt-1">每天递增 $0.03</p>
+            <div className="text-2xl font-bold text-green-500">{calculateHTPPrice()}</div>
+            <p className="text-xs text-muted-foreground mt-1">每天递增 0.03</p>
           </CardContent>
         </Card>
 
