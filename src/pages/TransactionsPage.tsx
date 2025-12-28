@@ -2,9 +2,16 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, TrendingUp, TrendingDown } from 'lucide-react';
-import { getTransactions } from '@/db/api';
+import { Loader2, TrendingUp, TrendingDown, ArrowRightLeft } from 'lucide-react';
+import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import { getTransactions, getHTPPrice } from '@/db/api';
+import { supabase } from '@/db/supabase';
 import type { Transaction, TransactionType } from '@/types/types';
 
 const transactionTypeLabels: Record<TransactionType, string> = {
@@ -26,19 +33,131 @@ const transactionTypeColors: Record<TransactionType, string> = {
 };
 
 export default function TransactionsPage() {
+  const { profile, refreshProfile } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'HTP' | 'USDT'>('all');
+  
+  // 闪兑交易相关状态
+  const [swapDialogOpen, setSwapDialogOpen] = useState(false);
+  const [htpAmount, setHtpAmount] = useState('');
+  const [usdtAmount, setUsdtAmount] = useState('');
+  const [htpPrice, setHtpPrice] = useState(0.01);
+  const [swapping, setSwapping] = useState(false);
 
   useEffect(() => {
     loadTransactions();
+    loadHTPPrice();
   }, []);
+
+  const loadHTPPrice = async () => {
+    const price = await getHTPPrice();
+    setHtpPrice(price);
+  };
 
   const loadTransactions = async () => {
     setLoading(true);
     const data = await getTransactions(200);
     setTransactions(data);
     setLoading(false);
+  };
+
+  // HTP输入变化时自动计算USDT
+  const handleHtpAmountChange = (value: string) => {
+    setHtpAmount(value);
+    const htp = parseFloat(value);
+    if (!isNaN(htp) && htp > 0) {
+      const usdt = htp * htpPrice;
+      setUsdtAmount(usdt.toFixed(4));
+    } else {
+      setUsdtAmount('');
+    }
+  };
+
+  // USDT输入变化时自动计算HTP
+  const handleUsdtAmountChange = (value: string) => {
+    setUsdtAmount(value);
+    const usdt = parseFloat(value);
+    if (!isNaN(usdt) && usdt > 0 && htpPrice > 0) {
+      const htp = usdt / htpPrice;
+      setHtpAmount(htp.toFixed(4));
+    } else {
+      setHtpAmount('');
+    }
+  };
+
+  // 执行闪兑交易
+  const handleSwap = async () => {
+    const htp = parseFloat(htpAmount);
+    const usdt = parseFloat(usdtAmount);
+
+    if (isNaN(htp) || htp <= 0) {
+      toast.error('请输入有效的HTP数量');
+      return;
+    }
+
+    if (!profile || profile.htp_balance < htp) {
+      toast.error('HTP余额不足');
+      return;
+    }
+
+    setSwapping(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('请先登录');
+        setSwapping(false);
+        return;
+      }
+
+      // 扣除HTP，增加USDT
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          htp_balance: profile.htp_balance - htp,
+          usdt_balance: (profile.usdt_balance || 0) + usdt,
+        })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+
+      // 记录交易：HTP转出
+      await supabase.from('transactions').insert({
+        user_id: user.id,
+        type: 'transfer_out',
+        amount: htp,
+        token_type: 'HTP',
+        status: 'completed',
+        description: `闪兑：HTP → USDT (汇率: $${htpPrice.toFixed(4)})`,
+      });
+
+      // 记录交易：USDT转入
+      await supabase.from('transactions').insert({
+        user_id: user.id,
+        type: 'transfer_in',
+        amount: usdt,
+        token_type: 'USDT',
+        status: 'completed',
+        description: `闪兑：HTP → USDT (汇率: $${htpPrice.toFixed(4)})`,
+      });
+
+      toast.success(`成功兑换 ${htp.toFixed(4)} HTP → ${usdt.toFixed(4)} USDT`);
+      
+      // 刷新数据
+      await refreshProfile();
+      await loadTransactions();
+      
+      // 重置表单
+      setHtpAmount('');
+      setUsdtAmount('');
+      setSwapDialogOpen(false);
+    } catch (error) {
+      console.error('闪兑失败:', error);
+      toast.error('闪兑失败，请稍后重试');
+    } finally {
+      setSwapping(false);
+    }
   };
 
   const filteredTransactions = transactions.filter(tx => {
@@ -73,7 +192,7 @@ export default function TransactionsPage() {
       </div>
 
       {/* 统计卡片 */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-3">
         <Card className="glow-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -98,27 +217,121 @@ export default function TransactionsPage() {
           </CardContent>
         </Card>
 
-        <Card className="glow-border">
+        {/* 闪兑交易卡片 */}
+        <Card className="glow-border-strong">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-green-500" />
-              USDT 收入
+              <ArrowRightLeft className="w-4 h-4 text-primary" />
+              闪兑交易
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-500">+{totalUsdtIn.toFixed(2)}</div>
-          </CardContent>
-        </Card>
+            <Dialog open={swapDialogOpen} onOpenChange={setSwapDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="w-full hover-glow">
+                  HTP → USDT
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <ArrowRightLeft className="w-5 h-5 text-primary" />
+                    闪兑交易
+                  </DialogTitle>
+                  <DialogDescription>
+                    将您的HTP代币即时兑换成USDT
+                  </DialogDescription>
+                </DialogHeader>
 
-        <Card className="glow-border">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <TrendingDown className="w-4 h-4 text-red-500" />
-              USDT 支出
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-500">-{totalUsdtOut.toFixed(2)}</div>
+                <div className="space-y-4 py-4">
+                  {/* 当前汇率 */}
+                  <div className="p-3 rounded-lg bg-accent/30 border border-border">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">当前汇率</span>
+                      <span className="font-bold text-primary">1 HTP = ${htpPrice.toFixed(4)} USDT</span>
+                    </div>
+                  </div>
+
+                  {/* 可用余额 */}
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">可用HTP余额</span>
+                    <span className="font-medium">{profile?.htp_balance?.toFixed(4) || '0.0000'} HTP</span>
+                  </div>
+
+                  {/* HTP输入 */}
+                  <div className="space-y-2">
+                    <Label htmlFor="htp-amount">兑换数量（HTP）</Label>
+                    <div className="relative">
+                      <Input
+                        id="htp-amount"
+                        type="number"
+                        step="0.0001"
+                        min="0"
+                        placeholder="输入HTP数量"
+                        value={htpAmount}
+                        onChange={(e) => handleHtpAmountChange(e.target.value)}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-1 top-1 h-7 text-xs"
+                        onClick={() => handleHtpAmountChange(profile?.htp_balance?.toString() || '0')}
+                      >
+                        全部
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* 兑换图标 */}
+                  <div className="flex justify-center">
+                    <div className="p-2 rounded-full bg-primary/10">
+                      <ArrowRightLeft className="w-5 h-5 text-primary" />
+                    </div>
+                  </div>
+
+                  {/* USDT输出 */}
+                  <div className="space-y-2">
+                    <Label htmlFor="usdt-amount">获得数量（USDT）</Label>
+                    <Input
+                      id="usdt-amount"
+                      type="number"
+                      step="0.0001"
+                      min="0"
+                      placeholder="自动计算"
+                      value={usdtAmount}
+                      onChange={(e) => handleUsdtAmountChange(e.target.value)}
+                    />
+                  </div>
+
+                  {/* 交易说明 */}
+                  <div className="p-3 rounded-lg bg-muted/50 text-xs text-muted-foreground space-y-1">
+                    <p>• 闪兑交易即时完成，无需等待</p>
+                    <p>• 汇率根据当前HTP市场价格计算</p>
+                    <p>• 兑换后的USDT可用于提现或其他用途</p>
+                  </div>
+
+                  {/* 操作按钮 */}
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => setSwapDialogOpen(false)}
+                      disabled={swapping}
+                    >
+                      取消
+                    </Button>
+                    <Button
+                      className="flex-1 hover-glow"
+                      onClick={handleSwap}
+                      disabled={swapping || !htpAmount || parseFloat(htpAmount) <= 0}
+                    >
+                      {swapping && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {swapping ? '兑换中...' : '确认兑换'}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </CardContent>
         </Card>
       </div>
