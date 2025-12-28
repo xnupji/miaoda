@@ -18,6 +18,17 @@ export default function DashboardPage() {
   const [recentRecords, setRecentRecords] = useState<MiningRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // 计算HTP当前价格：开盘价0.01，每天递增0.03
+  const calculateHTPPrice = () => {
+    const startDate = new Date('2025-01-01'); // 平台开始日期
+    const today = new Date();
+    const daysPassed = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const openingPrice = 0.01; // 开盘价
+    const dailyIncrease = 0.03; // 每日递增
+    const currentPrice = openingPrice + (daysPassed * dailyIncrease);
+    return currentPrice.toFixed(4); // 保留4位小数
+  };
+
   useEffect(() => {
     loadData();
   }, []);
@@ -81,12 +92,12 @@ export default function DashboardPage() {
 
         <Card className="glow-border hover-glow">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">USDT余额</CardTitle>
+            <CardTitle className="text-sm font-medium">HTP价格</CardTitle>
             <TrendingUp className="w-4 h-4 text-chart-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{profile?.usdt_balance?.toFixed(2) || '0.00'}</div>
-            <p className="text-xs text-muted-foreground mt-1">用于支付转出费用</p>
+            <div className="text-2xl font-bold text-green-500">${calculateHTPPrice()}</div>
+            <p className="text-xs text-muted-foreground mt-1">每天递增 $0.03</p>
           </CardContent>
         </Card>
 
