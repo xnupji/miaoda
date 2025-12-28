@@ -97,7 +97,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-500">{calculateHTPPrice()}</div>
-            <p className="text-xs text-muted-foreground mt-1">每天递增 0.03</p>
+            <p className="text-xs text-muted-foreground mt-1">HTP的价格为{calculateHTPPrice()}USDT</p>
           </CardContent>
         </Card>
 
