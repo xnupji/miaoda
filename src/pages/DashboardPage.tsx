@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { Sparkles, Wallet, Users, TrendingUp, Loader2, AlertCircle } from 'lucide-react';
 import { checkTodayMining, performMining, getMiningRecords } from '@/db/api';
 import type { MiningRecord } from '@/types/types';
+import InvestorsSection from '@/components/InvestorsSection';
 
 export default function DashboardPage() {
   const { profile, refreshProfile } = useAuth();
@@ -253,6 +254,9 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* 投资方信息 */}
+      <InvestorsSection />
     </div>
   );
 }

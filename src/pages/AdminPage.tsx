@@ -4,19 +4,23 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Shield, Users, FileCheck, Network, Loader2 } from 'lucide-react';
+import { Shield, Users, FileCheck, Network, Loader2, Wallet, Settings, TrendingUp } from 'lucide-react';
 import {
   getAllProfiles,
   updateUserRole,
   getAllWithdrawalRequests,
   reviewWithdrawalRequest,
   getAllMasterNodeApplications,
+  getPlatformConfig,
+  updateProfile,
 } from '@/db/api';
 import type { Profile, WithdrawalRequest, MasterNodeApplication } from '@/types/types';
+import { supabase } from '@/db/supabase';
 
 export default function AdminPage() {
   const [users, setUsers] = useState<Profile[]>([]);
@@ -31,10 +35,24 @@ export default function AdminPage() {
   }>({ open: false, type: null, id: null, action: null });
   const [rejectReason, setRejectReason] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [developerAddress, setDeveloperAddress] = useState('');
+  const [newDeveloperAddress, setNewDeveloperAddress] = useState('');
+  const [updatingAddress, setUpdatingAddress] = useState(false);
+  const [editingUser, setEditingUser] = useState<Profile | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   useEffect(() => {
     loadData();
+    loadDeveloperAddress();
   }, []);
+
+  const loadDeveloperAddress = async () => {
+    const address = await getPlatformConfig('developer_usdt_address');
+    if (address) {
+      setDeveloperAddress(address);
+      setNewDeveloperAddress(address);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -87,6 +105,58 @@ export default function AdminPage() {
     }
 
     setProcessing(false);
+  };
+
+  const handleUpdateDeveloperAddress = async () => {
+    if (!newDeveloperAddress.trim()) {
+      toast.error('请输入有效的钱包地址');
+      return;
+    }
+
+    setUpdatingAddress(true);
+    const { error } = await supabase
+      .from('platform_config')
+      .update({ config_value: newDeveloperAddress })
+      .eq('config_key', 'developer_usdt_address');
+
+    setUpdatingAddress(false);
+
+    if (error) {
+      toast.error('更新失败');
+    } else {
+      toast.success('开发者地址更新成功');
+      setDeveloperAddress(newDeveloperAddress);
+    }
+  };
+
+  const handleEditUser = (user: Profile) => {
+    setEditingUser({ ...user });
+    setEditDialogOpen(true);
+  };
+
+  const handleSaveUserEdit = async () => {
+    if (!editingUser) return;
+
+    setProcessing(true);
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        htp_balance: editingUser.htp_balance,
+        usdt_balance: editingUser.usdt_balance,
+        wallet_activated: editingUser.wallet_activated,
+        role: editingUser.role,
+      })
+      .eq('id', editingUser.id);
+
+    setProcessing(false);
+
+    if (error) {
+      toast.error('更新失败');
+    } else {
+      toast.success('用户信息更新成功');
+      setEditDialogOpen(false);
+      await loadData();
+    }
   };
 
   const pendingWithdrawals = withdrawals.filter(w => w.status === 'pending');
@@ -168,6 +238,10 @@ export default function AdminPage() {
               <Badge variant="destructive" className="ml-2">{pendingMasterNodes.length}</Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="settings">
+            <Settings className="w-4 h-4 mr-2" />
+            开发者设置
+          </TabsTrigger>
         </TabsList>
 
         {/* 用户管理 */}
@@ -191,6 +265,7 @@ export default function AdminPage() {
                         <TableHead>HTP余额</TableHead>
                         <TableHead>USDT余额</TableHead>
                         <TableHead>邀请人数</TableHead>
+                        <TableHead>钱包状态</TableHead>
                         <TableHead>注册时间</TableHead>
                         <TableHead>角色</TableHead>
                         <TableHead className="text-right">操作</TableHead>
@@ -203,6 +278,17 @@ export default function AdminPage() {
                           <TableCell>{user.htp_balance.toFixed(2)}</TableCell>
                           <TableCell>{user.usdt_balance.toFixed(2)}</TableCell>
                           <TableCell>{user.total_invites}</TableCell>
+                          <TableCell>
+                            {user.wallet_activated ? (
+                              <Badge variant="secondary" className="bg-green-500/10 text-green-500">
+                                已激活
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="bg-gray-500/10 text-gray-500">
+                                未激活
+                              </Badge>
+                            )}
+                          </TableCell>
                           <TableCell className="text-sm">
                             {new Date(user.created_at).toLocaleDateString('zh-CN')}
                           </TableCell>
@@ -221,16 +307,14 @@ export default function AdminPage() {
                               <Badge variant="secondary">普通用户</Badge>
                             )}
                           </TableCell>
-                          <TableCell className="text-right">
-                            <select
-                              value={user.role}
-                              onChange={(e) => handleRoleChange(user.id, e.target.value as typeof user.role)}
-                              className="text-sm border rounded px-2 py-1 bg-background"
+                          <TableCell className="text-right space-x-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEditUser(user)}
                             >
-                              <option value="user">普通用户</option>
-                              <option value="master_node">主节点</option>
-                              <option value="admin">管理员</option>
-                            </select>
+                              编辑
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -454,6 +538,51 @@ export default function AdminPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* 开发者设置 */}
+        <TabsContent value="settings">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wallet className="w-5 h-5" />
+                开发者钱包地址管理
+              </CardTitle>
+              <CardDescription>管理接收USDT的开发者钱包地址（仅管理员可修改）</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>当前开发者地址</Label>
+                <div className="p-3 rounded-lg bg-accent/30 border border-border">
+                  <p className="font-mono text-sm break-all">{developerAddress}</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="newAddress">新的开发者地址</Label>
+                <Input
+                  id="newAddress"
+                  type="text"
+                  placeholder="输入新的BSC钱包地址"
+                  value={newDeveloperAddress}
+                  onChange={(e) => setNewDeveloperAddress(e.target.value)}
+                  className="font-mono"
+                />
+                <p className="text-xs text-muted-foreground">
+                  此地址用于接收用户支付的钱包激活费用（30 USDT）
+                </p>
+              </div>
+
+              <Button
+                onClick={handleUpdateDeveloperAddress}
+                disabled={updatingAddress || newDeveloperAddress === developerAddress}
+                className="w-full hover-glow"
+              >
+                {updatingAddress && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                更新开发者地址
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       {/* 审核对话框 */}
@@ -505,6 +634,105 @@ export default function AdminPage() {
               确认
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 用户编辑对话框 */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>编辑用户信息</DialogTitle>
+            <DialogDescription>
+              修改用户的余额、钱包状态和角色权限
+            </DialogDescription>
+          </DialogHeader>
+          {editingUser && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>用户名</Label>
+                <Input value={editingUser.username} disabled />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="htp_balance">HTP余额</Label>
+                  <Input
+                    id="htp_balance"
+                    type="number"
+                    step="0.01"
+                    value={editingUser.htp_balance}
+                    onChange={(e) => setEditingUser({
+                      ...editingUser,
+                      htp_balance: parseFloat(e.target.value) || 0
+                    })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="usdt_balance">USDT余额</Label>
+                  <Input
+                    id="usdt_balance"
+                    type="number"
+                    step="0.01"
+                    value={editingUser.usdt_balance}
+                    onChange={(e) => setEditingUser({
+                      ...editingUser,
+                      usdt_balance: parseFloat(e.target.value) || 0
+                    })}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="role">用户角色</Label>
+                <select
+                  id="role"
+                  value={editingUser.role}
+                  onChange={(e) => setEditingUser({
+                    ...editingUser,
+                    role: e.target.value as typeof editingUser.role
+                  })}
+                  className="w-full border rounded px-3 py-2 bg-background"
+                >
+                  <option value="user">普通用户</option>
+                  <option value="master_node">主节点</option>
+                  <option value="admin">管理员</option>
+                </select>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="wallet_activated"
+                  checked={editingUser.wallet_activated}
+                  onChange={(e) => setEditingUser({
+                    ...editingUser,
+                    wallet_activated: e.target.checked
+                  })}
+                  className="w-4 h-4"
+                />
+                <Label htmlFor="wallet_activated" className="cursor-pointer">
+                  钱包已激活
+                </Label>
+              </div>
+
+              <div className="flex gap-2 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setEditDialogOpen(false)}
+                >
+                  取消
+                </Button>
+                <Button
+                  onClick={handleSaveUserEdit}
+                  disabled={processing}
+                >
+                  {processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  保存
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
