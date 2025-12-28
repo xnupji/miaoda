@@ -18,6 +18,9 @@ import {
   getAllMasterNodeApplications,
   getPlatformConfig,
   updateProfile,
+  getSystemSetting,
+  updateSystemSetting,
+  getHTPPrice,
 } from '@/db/api';
 import type { Profile, WithdrawalRequest, MasterNodeApplication } from '@/types/types';
 import { supabase } from '@/db/supabase';
@@ -40,10 +43,17 @@ export default function AdminPage() {
   const [updatingAddress, setUpdatingAddress] = useState(false);
   const [editingUser, setEditingUser] = useState<Profile | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  
+  // HTP价格管理相关状态
+  const [htpPriceMode, setHtpPriceMode] = useState<'auto' | 'manual'>('auto');
+  const [currentHtpPrice, setCurrentHtpPrice] = useState(0.01);
+  const [newHtpPrice, setNewHtpPrice] = useState('');
+  const [updatingPrice, setUpdatingPrice] = useState(false);
 
   useEffect(() => {
     loadData();
     loadDeveloperAddress();
+    loadHtpPriceSettings();
   }, []);
 
   const loadDeveloperAddress = async () => {
@@ -126,6 +136,52 @@ export default function AdminPage() {
     } else {
       toast.success('开发者地址更新成功');
       setDeveloperAddress(newDeveloperAddress);
+    }
+  };
+
+  // 加载HTP价格设置
+  const loadHtpPriceSettings = async () => {
+    const mode = await getSystemSetting('htp_price_mode');
+    setHtpPriceMode((mode as 'auto' | 'manual') || 'auto');
+    
+    const price = await getHTPPrice();
+    setCurrentHtpPrice(price);
+    
+    if (mode === 'manual') {
+      const priceStr = await getSystemSetting('htp_price');
+      setNewHtpPrice(priceStr || '');
+    }
+  };
+
+  // 切换价格模式
+  const handlePriceModeChange = async (mode: 'auto' | 'manual') => {
+    const success = await updateSystemSetting('htp_price_mode', mode);
+    if (success) {
+      setHtpPriceMode(mode);
+      toast.success(`已切换到${mode === 'auto' ? '自动' : '手动'}模式`);
+      await loadHtpPriceSettings();
+    } else {
+      toast.error('切换失败');
+    }
+  };
+
+  // 更新HTP价格
+  const handleUpdateHtpPrice = async () => {
+    const price = parseFloat(newHtpPrice);
+    if (isNaN(price) || price <= 0) {
+      toast.error('请输入有效的价格');
+      return;
+    }
+
+    setUpdatingPrice(true);
+    const success = await updateSystemSetting('htp_price', price.toString());
+    setUpdatingPrice(false);
+
+    if (success) {
+      toast.success('HTP价格更新成功');
+      await loadHtpPriceSettings();
+    } else {
+      toast.error('更新失败');
     }
   };
 
@@ -541,47 +597,125 @@ export default function AdminPage() {
 
         {/* 开发者设置 */}
         <TabsContent value="settings">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Wallet className="w-5 h-5" />
-                开发者钱包地址管理
-              </CardTitle>
-              <CardDescription>管理接收USDT的开发者钱包地址（仅管理员可修改）</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>当前开发者地址</Label>
-                <div className="p-3 rounded-lg bg-accent/30 border border-border">
-                  <p className="font-mono text-sm break-all">{developerAddress}</p>
+          <div className="space-y-4">
+            {/* 开发者钱包地址管理 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Wallet className="w-5 h-5" />
+                  开发者钱包地址管理
+                </CardTitle>
+                <CardDescription>管理接收USDT的开发者钱包地址（仅管理员可修改）</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>当前开发者地址</Label>
+                  <div className="p-3 rounded-lg bg-accent/30 border border-border">
+                    <p className="font-mono text-sm break-all">{developerAddress}</p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="newAddress">新的开发者地址</Label>
-                <Input
-                  id="newAddress"
-                  type="text"
-                  placeholder="输入新的BSC钱包地址"
-                  value={newDeveloperAddress}
-                  onChange={(e) => setNewDeveloperAddress(e.target.value)}
-                  className="font-mono"
-                />
-                <p className="text-xs text-muted-foreground">
-                  此地址用于接收用户支付的钱包激活费用（30 USDT）
-                </p>
-              </div>
+                <div className="space-y-2">
+                  <Label htmlFor="newAddress">新的开发者地址</Label>
+                  <Input
+                    id="newAddress"
+                    type="text"
+                    placeholder="输入新的BSC钱包地址"
+                    value={newDeveloperAddress}
+                    onChange={(e) => setNewDeveloperAddress(e.target.value)}
+                    className="font-mono"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    此地址用于接收用户支付的钱包激活费用（30 USDT）
+                  </p>
+                </div>
 
-              <Button
-                onClick={handleUpdateDeveloperAddress}
-                disabled={updatingAddress || newDeveloperAddress === developerAddress}
-                className="w-full hover-glow"
-              >
-                {updatingAddress && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                更新开发者地址
-              </Button>
-            </CardContent>
-          </Card>
+                <Button
+                  onClick={handleUpdateDeveloperAddress}
+                  disabled={updatingAddress || newDeveloperAddress === developerAddress}
+                  className="w-full hover-glow"
+                >
+                  {updatingAddress && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  更新开发者地址
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* HTP价格管理 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5" />
+                  HTP价格管理
+                </CardTitle>
+                <CardDescription>根据市场需求调整HTP代币的显示价格</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>价格模式</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      variant={htpPriceMode === 'auto' ? 'default' : 'outline'}
+                      onClick={() => handlePriceModeChange('auto')}
+                      className="flex-1"
+                    >
+                      自动计算
+                    </Button>
+                    <Button
+                      variant={htpPriceMode === 'manual' ? 'default' : 'outline'}
+                      onClick={() => handlePriceModeChange('manual')}
+                      className="flex-1"
+                    >
+                      手动设置
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {htpPriceMode === 'auto' 
+                      ? '自动模式：开盘价$0.01，每天递增$0.03' 
+                      : '手动模式：由管理员设置固定价格'}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>当前HTP价格</Label>
+                  <div className="p-3 rounded-lg bg-accent/30 border border-border">
+                    <p className="text-2xl font-bold text-primary">
+                      ${currentHtpPrice.toFixed(4)}
+                    </p>
+                  </div>
+                </div>
+
+                {htpPriceMode === 'manual' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="newPrice">设置新价格（美元）</Label>
+                    <Input
+                      id="newPrice"
+                      type="number"
+                      step="0.0001"
+                      min="0"
+                      placeholder="输入新的HTP价格"
+                      value={newHtpPrice}
+                      onChange={(e) => setNewHtpPrice(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      设置后将立即生效，影响所有用户看到的HTP价格
+                    </p>
+                  </div>
+                )}
+
+                {htpPriceMode === 'manual' && (
+                  <Button
+                    onClick={handleUpdateHtpPrice}
+                    disabled={updatingPrice || !newHtpPrice || parseFloat(newHtpPrice) <= 0}
+                    className="w-full hover-glow"
+                  >
+                    {updatingPrice && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    更新HTP价格
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
 

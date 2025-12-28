@@ -112,3 +112,13 @@ export interface PublicProfile {
   is_master_node: boolean;
   created_at: string;
 }
+
+// 系统设置
+export interface SystemSetting {
+  id: string;
+  setting_key: string;
+  setting_value: string;
+  description: string | null;
+  updated_at: string;
+  updated_by: string | null;
+}

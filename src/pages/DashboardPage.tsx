@@ -7,7 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Sparkles, Wallet, Users, TrendingUp, Loader2, AlertCircle } from 'lucide-react';
-import { checkTodayMining, performMining, getMiningRecords } from '@/db/api';
+import { checkTodayMining, performMining, getMiningRecords, getHTPPrice } from '@/db/api';
 import type { MiningRecord } from '@/types/types';
 import InvestorsSection from '@/components/InvestorsSection';
 
@@ -18,20 +18,11 @@ export default function DashboardPage() {
   const [hasMined, setHasMined] = useState(false);
   const [recentRecords, setRecentRecords] = useState<MiningRecord[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // 计算HTP当前价格：开盘价0.01，每天递增0.03
-  const calculateHTPPrice = () => {
-    const startDate = new Date('2025-01-01'); // 平台开始日期
-    const today = new Date();
-    const daysPassed = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-    const openingPrice = 0.01; // 开盘价
-    const dailyIncrease = 0.03; // 每日递增
-    const currentPrice = openingPrice + (daysPassed * dailyIncrease);
-    return currentPrice.toFixed(4); // 保留4位小数
-  };
+  const [htpPrice, setHtpPrice] = useState('0.0100');
 
   useEffect(() => {
     loadData();
+    loadHTPPrice();
   }, []);
 
   const loadData = async () => {
@@ -42,6 +33,11 @@ export default function DashboardPage() {
     const records = await getMiningRecords(5);
     setRecentRecords(records);
     setLoading(false);
+  };
+
+  const loadHTPPrice = async () => {
+    const price = await getHTPPrice();
+    setHtpPrice(price.toFixed(4));
   };
 
   const handleMining = async () => {
@@ -97,8 +93,8 @@ export default function DashboardPage() {
             <TrendingUp className="w-4 h-4 text-chart-2" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-500">{calculateHTPPrice()}</div>
-            <p className="text-xs text-muted-foreground mt-1">HTP的价格为{calculateHTPPrice()}USDT</p>
+            <div className="text-2xl font-bold text-green-500">${htpPrice}</div>
+            <p className="text-xs text-muted-foreground mt-1">HTP的价格为${htpPrice} USDT</p>
           </CardContent>
         </Card>
 

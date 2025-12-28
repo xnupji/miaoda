@@ -7,6 +7,7 @@ import type {
   MasterNodeApplication,
   WithdrawalRequest,
   PlatformConfig,
+  SystemSetting,
 } from '@/types/types';
 
 // ==================== 平台配置相关 ====================
@@ -488,4 +489,76 @@ export async function updateUserRole(userId: string, role: 'user' | 'admin' | 'm
   }
 
   return true;
+}
+
+// ==================== 系统设置相关 ====================
+
+// 获取系统设置
+export async function getSystemSetting(key: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('system_settings')
+    .select('setting_value')
+    .eq('setting_key', key)
+    .maybeSingle();
+
+  if (error) {
+    console.error('获取系统设置失败:', error);
+    return null;
+  }
+
+  return data?.setting_value || null;
+}
+
+// 获取所有系统设置
+export async function getAllSystemSettings(): Promise<SystemSetting[]> {
+  const { data, error } = await supabase
+    .from('system_settings')
+    .select('*')
+    .order('setting_key');
+
+  if (error) {
+    console.error('获取系统设置失败:', error);
+    return [];
+  }
+
+  return Array.isArray(data) ? data : [];
+}
+
+// 更新系统设置
+export async function updateSystemSetting(key: string, value: string): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const { error } = await supabase
+    .from('system_settings')
+    .update({ 
+      setting_value: value,
+      updated_by: user.id 
+    })
+    .eq('setting_key', key);
+
+  if (error) {
+    console.error('更新系统设置失败:', error);
+    return false;
+  }
+
+  return true;
+}
+
+// 获取HTP当前价格
+export async function getHTPPrice(): Promise<number> {
+  // 先获取价格模式
+  const mode = await getSystemSetting('htp_price_mode');
+  
+  if (mode === 'manual') {
+    // 手动模式：从数据库读取
+    const priceStr = await getSystemSetting('htp_price');
+    return priceStr ? parseFloat(priceStr) : 0.01;
+  } else {
+    // 自动模式：按照原来的计算逻辑
+    const startDate = new Date('2025-01-01');
+    const today = new Date();
+    const daysPassed = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    return 0.01 + (daysPassed * 0.03);
+  }
 }
