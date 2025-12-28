@@ -6,7 +6,63 @@ import type {
   Invitation,
   MasterNodeApplication,
   WithdrawalRequest,
+  PlatformConfig,
 } from '@/types/types';
+
+// ==================== 平台配置相关 ====================
+
+// 获取平台配置
+export async function getPlatformConfig(key: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('platform_config')
+    .select('config_value')
+    .eq('config_key', key)
+    .maybeSingle();
+
+  if (error) {
+    console.error('获取平台配置失败:', error);
+    return null;
+  }
+
+  return data?.config_value || null;
+}
+
+// 获取所有平台配置
+export async function getAllPlatformConfigs(): Promise<PlatformConfig[]> {
+  const { data, error } = await supabase
+    .from('platform_config')
+    .select('*')
+    .order('config_key');
+
+  if (error) {
+    console.error('获取平台配置失败:', error);
+    return [];
+  }
+
+  return Array.isArray(data) ? data : [];
+}
+
+// 激活钱包（用户支付30 USDT后调用）
+export async function activateWallet(paidAmount: number): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      wallet_activated: true,
+      activation_paid_amount: paidAmount,
+      activation_paid_at: new Date().toISOString(),
+    })
+    .eq('id', user.id);
+
+  if (error) {
+    console.error('激活钱包失败:', error);
+    return false;
+  }
+
+  return true;
+}
 
 // ==================== 用户相关 ====================
 

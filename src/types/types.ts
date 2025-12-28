@@ -22,11 +22,24 @@ export interface Profile {
   htp_balance: number;
   usdt_balance: number;
   wallet_address: string | null;
+  wallet_activated: boolean;
+  activation_paid_amount: number | null;
+  activation_paid_at: string | null;
   invited_by: string | null;
   invitation_code: string;
   total_invites: number;
   is_master_node: boolean;
   master_node_progress: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// 平台配置
+export interface PlatformConfig {
+  id: string;
+  config_key: string;
+  config_value: string;
+  description: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -8,8 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Wallet, Link as LinkIcon, AlertCircle, Loader2, Send } from 'lucide-react';
-import { updateProfile } from '@/db/api';
+import { Wallet, Link as LinkIcon, AlertCircle, Loader2, Send, Copy, CheckCircle2 } from 'lucide-react';
+import { updateProfile, getPlatformConfig, activateWallet } from '@/db/api';
 import { createWithdrawalRequest, getMyWithdrawalRequests } from '@/db/api';
 import type { WithdrawalRequest } from '@/types/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -28,10 +28,23 @@ export default function WalletPage() {
     usdtPaid: '',
   });
   const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [developerAddress, setDeveloperAddress] = useState<string>('');
+  const [activationFee, setActivationFee] = useState<string>('30');
+  const [copied, setCopied] = useState(false);
+  const [activationAmount, setActivationAmount] = useState('');
+  const [isActivating, setIsActivating] = useState(false);
 
   useEffect(() => {
     loadWithdrawalRequests();
+    loadPlatformConfig();
   }, []);
+
+  const loadPlatformConfig = async () => {
+    const address = await getPlatformConfig('developer_usdt_address');
+    const fee = await getPlatformConfig('wallet_activation_fee');
+    if (address) setDeveloperAddress(address);
+    if (fee) setActivationFee(fee);
+  };
 
   const loadWithdrawalRequests = async () => {
     setLoading(true);
@@ -63,6 +76,37 @@ export default function WalletPage() {
     }
   };
 
+  const handleCopyAddress = async () => {
+    try {
+      await navigator.clipboard.writeText(developerAddress);
+      setCopied(true);
+      toast.success('地址已复制到剪贴板');
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      toast.error('复制失败，请手动复制');
+    }
+  };
+
+  const handleActivateWallet = async () => {
+    const amount = parseFloat(activationAmount);
+    if (isNaN(amount) || amount < parseFloat(activationFee)) {
+      toast.error(`请输入至少 ${activationFee} USDT`);
+      return;
+    }
+
+    setIsActivating(true);
+    const success = await activateWallet(amount);
+    setIsActivating(false);
+
+    if (success) {
+      toast.success('钱包激活成功！现在可以提取HTP代币了');
+      await refreshProfile();
+      setActivationAmount('');
+    } else {
+      toast.error('激活失败，请稍后重试');
+    }
+  };
+
   const handleWithdrawal = async () => {
     if (!withdrawalForm.amount || !withdrawalForm.toAddress) {
       toast.error('请填写完整信息');
@@ -79,6 +123,12 @@ export default function WalletPage() {
     const balance = withdrawalForm.tokenType === 'HTP' ? profile?.htp_balance : profile?.usdt_balance;
     if (!balance || amount > balance) {
       toast.error('余额不足');
+      return;
+    }
+
+    // HTP提币需要钱包已激活
+    if (withdrawalForm.tokenType === 'HTP' && !profile?.wallet_activated) {
+      toast.error('请先激活钱包才能提取HTP代币');
       return;
     }
 
@@ -249,10 +299,96 @@ export default function WalletPage() {
               <DialogHeader>
                 <DialogTitle>提币申请</DialogTitle>
                 <DialogDescription>
-                  填写提币信息，提交后需要管理员审核
+                  {profile?.wallet_activated 
+                    ? '填写提币信息，提交后需要管理员审核' 
+                    : '您的钱包尚未激活，需要先激活才能提取HTP代币'}
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-4">
+
+              {!profile?.wallet_activated ? (
+                // 钱包未激活 - 显示激活界面
+                <div className="space-y-4">
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      <strong>钱包待激活</strong>
+                      <p className="mt-2">
+                        您的钱包地址尚未激活。需要向开发者转入 <strong>{activationFee} USDT</strong> 来激活钱包，激活后即可提取HTP代币。
+                      </p>
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="space-y-3 p-4 rounded-lg bg-accent/30 border border-border">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">激活费用</span>
+                      <Badge variant="secondary" className="bg-primary/10 text-primary">
+                        {activationFee} USDT
+                      </Badge>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">开发者USDT地址（BSC网络）</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          value={developerAddress}
+                          readOnly
+                          className="font-mono text-xs"
+                        />
+                        <Button
+                          onClick={handleCopyAddress}
+                          variant="outline"
+                          size="icon"
+                        >
+                          {copied ? (
+                            <CheckCircle2 className="h-4 w-4 text-green-500" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        请使用您绑定的钱包地址向上述地址转账 {activationFee} USDT（BSC网络）
+                      </p>
+                    </div>
+                  </div>
+
+                  <Alert>
+                    <AlertDescription>
+                      <strong>激活步骤：</strong>
+                      <ol className="mt-2 space-y-1 text-sm list-decimal list-inside">
+                        <li>复制上方的开发者USDT地址</li>
+                        <li>使用您绑定的钱包向该地址转账 {activationFee} USDT（BSC网络）</li>
+                        <li>转账完成后，在下方输入实际支付金额</li>
+                        <li>点击"确认激活"按钮</li>
+                        <li>等待管理员确认后，钱包即可激活</li>
+                      </ol>
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="activationAmount">实际支付金额（USDT）</Label>
+                    <Input
+                      id="activationAmount"
+                      type="number"
+                      placeholder={`请输入支付的USDT金额（至少 ${activationFee}）`}
+                      value={activationAmount}
+                      onChange={(e) => setActivationAmount(e.target.value)}
+                    />
+                  </div>
+
+                  <Button
+                    onClick={handleActivateWallet}
+                    disabled={isActivating || !activationAmount}
+                    className="w-full hover-glow"
+                    size="lg"
+                  >
+                    {isActivating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    确认激活钱包
+                  </Button>
+                </div>
+              ) : (
+                // 钱包已激活 - 显示提币表单
+                <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>代币类型</Label>
                   <div className="flex gap-2">
@@ -319,7 +455,8 @@ export default function WalletPage() {
                   {isWithdrawing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   提交申请
                 </Button>
-              </div>
+                </div>
+              )}
             </DialogContent>
           </Dialog>
         </CardContent>
