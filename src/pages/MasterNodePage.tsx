@@ -1,20 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWeb3 } from '@/contexts/Web3Context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Network, CheckCircle, Clock, XCircle, Loader2, Award } from 'lucide-react';
-import { getMasterNodeApplication, applyMasterNode } from '@/db/api';
+import { Network, CheckCircle, Clock, XCircle, Loader2, Award, Wallet } from 'lucide-react';
+import { getMasterNodeApplication, applyMasterNode, updateProfile } from '@/db/api';
 import type { MasterNodeApplication } from '@/types/types';
 
 export default function MasterNodePage() {
   const { profile, refreshProfile } = useAuth();
+  const { account, isConnected, connectWallet, isCorrectNetwork } = useWeb3();
   const [application, setApplication] = useState<MasterNodeApplication | null>(null);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
+  const [binding, setBinding] = useState(false);
+  const [bindDialogOpen, setBindDialogOpen] = useState(false);
 
   useEffect(() => {
     loadApplication();
@@ -38,6 +43,30 @@ export default function MasterNodePage() {
       await refreshProfile();
     } else {
       toast.error('申请失败，请稍后重试');
+    }
+  };
+
+  const handleBindWallet = async () => {
+    if (!isConnected || !account) {
+      toast.error('请先连接钱包');
+      return;
+    }
+
+    if (!isCorrectNetwork) {
+      toast.error('请切换到BSC网络');
+      return;
+    }
+
+    setBinding(true);
+    const success = await updateProfile({ wallet_address: account });
+    setBinding(false);
+
+    if (success) {
+      toast.success('钱包地址绑定成功！');
+      await refreshProfile();
+      setBindDialogOpen(false);
+    } else {
+      toast.error('绑定失败，请稍后重试');
     }
   };
 
@@ -118,15 +147,95 @@ export default function MasterNodePage() {
               </ul>
             </div>
 
-            <Button
-              onClick={handleApply}
-              disabled={applying || !profile?.wallet_address}
-              className="w-full hover-glow"
-              size="lg"
-            >
-              {applying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {!profile?.wallet_address ? '请先绑定钱包地址' : '提交申请'}
-            </Button>
+            {!profile?.wallet_address ? (
+              <Dialog open={bindDialogOpen} onOpenChange={setBindDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button className="w-full hover-glow" size="lg">
+                    <Wallet className="mr-2 h-5 w-5" />
+                    绑定钱包地址
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>绑定钱包地址</DialogTitle>
+                    <DialogDescription>
+                      连接您的MetaMask钱包并绑定地址，绑定后才能申请主节点
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    {!isConnected ? (
+                      <div className="space-y-4">
+                        <Alert>
+                          <AlertDescription>
+                            请先连接您的MetaMask钱包到BSC网络
+                          </AlertDescription>
+                        </Alert>
+                        <Button onClick={connectWallet} className="w-full hover-glow" size="lg">
+                          <Wallet className="w-5 h-5 mr-2" />
+                          连接MetaMask钱包
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="p-4 rounded-lg bg-accent/30 border border-border">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm text-muted-foreground">连接状态</span>
+                            <Badge variant="secondary" className="bg-green-500/10 text-green-500">
+                              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse mr-2" />
+                              已连接
+                            </Badge>
+                          </div>
+                          <p className="font-mono text-sm break-all">{account}</p>
+                        </div>
+
+                        <div className="p-4 rounded-lg bg-accent/30 border border-border">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">网络</span>
+                            {isCorrectNetwork ? (
+                              <Badge variant="secondary" className="bg-green-500/10 text-green-500">
+                                BSC网络
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="bg-red-500/10 text-red-500">
+                                错误网络
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+
+                        {!isCorrectNetwork && (
+                          <Alert variant="destructive">
+                            <AlertDescription>
+                              请在MetaMask中切换到BSC（Binance Smart Chain）网络
+                            </AlertDescription>
+                          </Alert>
+                        )}
+
+                        <Button
+                          onClick={handleBindWallet}
+                          disabled={!isCorrectNetwork || binding}
+                          className="w-full hover-glow"
+                          size="lg"
+                        >
+                          {binding && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                          {!isCorrectNetwork ? '请切换到BSC网络' : '确认绑定'}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </DialogContent>
+              </Dialog>
+            ) : (
+              <Button
+                onClick={handleApply}
+                disabled={applying}
+                className="w-full hover-glow"
+                size="lg"
+              >
+                {applying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                提交申请
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
