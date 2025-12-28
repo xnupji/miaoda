@@ -71,15 +71,15 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* 欢迎标题 */}
       <div>
-        <h1 className="text-3xl font-bold gradient-text">欢迎回来，{profile?.username}！</h1>
-        <p className="text-muted-foreground mt-2">开始您的每日挖矿之旅</p>
+        <h1 className="text-2xl font-bold gradient-text">欢迎回来，{profile?.username}！</h1>
+        <p className="text-muted-foreground mt-1">开始您的每日挖矿之旅</p>
       </div>
 
       {/* 统计卡片 */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
         <Card className="glow-border hover-glow">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">HTP余额</CardTitle>
@@ -131,16 +131,16 @@ export default function DashboardPage() {
 
       {/* 挖矿卡片 */}
       <Card className="glow-border-strong">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Sparkles className="w-6 h-6 text-primary" />
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Sparkles className="w-5 h-5 text-primary" />
             每日挖矿
           </CardTitle>
           <CardDescription>每天点击一次即可获得HTP代币奖励</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3">
           {!isConnected && (
-            <div className="flex items-center gap-2 p-4 rounded-lg bg-accent/50 border border-border">
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-accent/50 border border-border">
               <AlertCircle className="w-5 h-5 text-primary" />
               <p className="text-sm">请先连接钱包才能开始挖矿</p>
               <Button onClick={connectWallet} size="sm" className="ml-auto">
@@ -150,19 +150,19 @@ export default function DashboardPage() {
           )}
 
           {isConnected && !profile?.wallet_address && (
-            <div className="flex items-center gap-2 p-4 rounded-lg bg-accent/50 border border-border">
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-accent/50 border border-border">
               <AlertCircle className="w-5 h-5 text-primary" />
               <p className="text-sm">请先在钱包管理页面绑定钱包地址</p>
             </div>
           )}
 
-          <div className="flex flex-col items-center justify-center py-8 space-y-4">
+          <div className="flex flex-col items-center justify-center py-6 space-y-3">
             <div className="relative">
               <div className={cn(
-                "w-32 h-32 rounded-full flex items-center justify-center",
+                "w-28 h-28 rounded-full flex items-center justify-center",
                 hasMined ? "bg-muted" : "bg-gradient-to-br from-primary to-chart-3 pulse-glow"
               )}>
-                <Sparkles className="w-16 h-16 text-white" />
+                <Sparkles className="w-14 h-14 text-white" />
               </div>
             </div>
 
@@ -170,7 +170,7 @@ export default function DashboardPage() {
               size="lg"
               onClick={handleMining}
               disabled={isMining || hasMined || !isConnected || !profile?.wallet_address}
-              className="px-8 py-6 text-lg hover-glow"
+              className="px-6 py-5 text-base hover-glow"
             >
               {isMining && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
               {hasMined ? '今日已挖矿' : isMining ? '挖矿中...' : '开始挖矿'}
@@ -187,21 +187,21 @@ export default function DashboardPage() {
 
       {/* 最近挖矿记录 */}
       <Card>
-        <CardHeader>
-          <CardTitle>最近挖矿记录</CardTitle>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">最近挖矿记录</CardTitle>
           <CardDescription>查看您最近的挖矿收益</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex justify-center py-8">
+            <div className="flex justify-center py-6">
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
             </div>
           ) : recentRecords.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-center py-6 text-muted-foreground">
               暂无挖矿记录，开始您的第一次挖矿吧！
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {recentRecords.map((record) => (
                 <div
                   key={record.id}
