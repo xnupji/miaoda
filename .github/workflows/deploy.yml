@@ -25,14 +25,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8
 
       - name: Install dependencies
-        run: npm install
+        run: pnpm install
 
       - name: Build
         run: |
-          npm run build
+          pnpm run build
           cp dist/index.html dist/404.html
 
       - name: Upload artifact
