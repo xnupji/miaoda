@@ -71,7 +71,7 @@ CREATE TABLE public.withdrawal_requests (
   token_type text NOT NULL CHECK (token_type IN ('HTP', 'USDT')),
   to_address text NOT NULL,
   status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
-  usdt_paid numeric(20, 8),
+  payment_address text,
   created_at timestamptz NOT NULL DEFAULT now(),
   reviewed_at timestamptz,
   reviewed_by uuid REFERENCES public.profiles(id),

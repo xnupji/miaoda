@@ -95,7 +95,7 @@ export interface WithdrawalRequest {
   token_type: TokenType;
   to_address: string;
   status: ReviewStatus;
-  usdt_paid: number | null;
+  payment_address: string | null;
   created_at: string;
   reviewed_at: string | null;
   reviewed_by: string | null;

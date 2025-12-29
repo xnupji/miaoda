@@ -25,7 +25,7 @@ export default function WalletPage() {
     amount: '',
     tokenType: 'HTP' as 'HTP' | 'USDT',
     toAddress: '',
-    usdtPaid: '',
+    paymentAddress: '',
   });
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [developerAddress, setDeveloperAddress] = useState<string>('');
@@ -132,18 +132,10 @@ export default function WalletPage() {
       return;
     }
 
-    // HTP提币需要支付USDT手续费
-    if (withdrawalForm.tokenType === 'HTP') {
-      if (!withdrawalForm.usdtPaid) {
-        toast.error('请输入已支付的USDT金额');
-        return;
-      }
-
-      const usdtPaid = parseFloat(withdrawalForm.usdtPaid);
-      if (isNaN(usdtPaid) || usdtPaid <= 0) {
-        toast.error('请输入有效的USDT金额');
-        return;
-      }
+    // 提币需要验证转账钱包地址
+    if (!withdrawalForm.paymentAddress) {
+      toast.error('请输入验证转账钱包地址');
+      return;
     }
 
     setIsWithdrawing(true);
@@ -151,7 +143,7 @@ export default function WalletPage() {
       amount,
       withdrawalForm.tokenType,
       withdrawalForm.toAddress,
-      withdrawalForm.tokenType === 'HTP' ? parseFloat(withdrawalForm.usdtPaid) : undefined
+      withdrawalForm.paymentAddress
     );
     setIsWithdrawing(false);
 
@@ -432,21 +424,19 @@ export default function WalletPage() {
                   />
                 </div>
 
-                {withdrawalForm.tokenType === 'HTP' && (
-                  <div className="space-y-2">
-                    <Label htmlFor="usdtPaid">已支付USDT金额</Label>
-                    <Input
-                      id="usdtPaid"
-                      type="number"
-                      placeholder="提币需要支付相应的USDT"
-                      value={withdrawalForm.usdtPaid}
-                      onChange={(e) => setWithdrawalForm({ ...withdrawalForm, usdtPaid: e.target.value })}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      提示：HTP代币转出需要向开发者转入相应数量的虚拟USDT
-                    </p>
-                  </div>
-                )}
+                <div className="space-y-2">
+                  <Label htmlFor="paymentAddress">验证转账钱包地址</Label>
+                  <Input
+                    id="paymentAddress"
+                    type="text"
+                    placeholder="请输入您的付款钱包地址"
+                    value={withdrawalForm.paymentAddress}
+                    onChange={(e) => setWithdrawalForm({ ...withdrawalForm, paymentAddress: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    提示：请填写用于验证身份的转账钱包地址，管理员审核通过后方可提币
+                  </p>
+                </div>
 
                 <Button
                   onClick={handleWithdrawal}

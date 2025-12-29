@@ -407,6 +407,7 @@ export default function AdminPage() {
                         <TableHead>代币</TableHead>
                         <TableHead className="text-right">数量</TableHead>
                         <TableHead>接收地址</TableHead>
+                        <TableHead>付款地址</TableHead>
                         <TableHead>申请时间</TableHead>
                         <TableHead>状态</TableHead>
                         <TableHead className="text-right">操作</TableHead>

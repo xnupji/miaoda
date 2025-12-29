@@ -374,7 +374,7 @@ export async function createWithdrawalRequest(
   amount: number,
   tokenType: 'HTP' | 'USDT',
   toAddress: string,
-  usdtPaid?: number
+  paymentAddress?: string
 ): Promise<boolean> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return false;
@@ -387,7 +387,7 @@ export async function createWithdrawalRequest(
       token_type: tokenType,
       to_address: toAddress,
       status: 'pending',
-      usdt_paid: usdtPaid || null,
+      payment_address: paymentAddress || null,
     });
 
   if (error) {
