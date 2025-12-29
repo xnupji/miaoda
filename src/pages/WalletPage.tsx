@@ -149,7 +149,7 @@ export default function WalletPage() {
 
     if (success) {
       toast.success('提币申请已提交，等待管理员审核');
-      setWithdrawalForm({ amount: '', tokenType: 'HTP', toAddress: '', usdtPaid: '' });
+      setWithdrawalForm({ amount: '', tokenType: 'HTP', toAddress: '', paymentAddress: '' });
       await loadWithdrawalRequests();
     } else {
       toast.error('提交失败，请稍后重试');

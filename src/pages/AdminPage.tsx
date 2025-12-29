@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -430,6 +430,9 @@ export default function AdminPage() {
                             </TableCell>
                             <TableCell className="font-mono text-xs">
                               {withdrawal.to_address.slice(0, 10)}...
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {withdrawal.payment_address ? withdrawal.payment_address.slice(0, 10) + '...' : '-'}
                             </TableCell>
                             <TableCell className="text-sm">
                               {new Date(withdrawal.created_at).toLocaleString('zh-CN')}
