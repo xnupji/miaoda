@@ -107,7 +107,7 @@ export default function LoginPage() {
             navigate(from, { replace: true });
         } catch (e) {
             // 忽略错误，可能需要邮箱验证
-             toast.info('如果需要邮箱验证，请前往邮箱确认。');
+             toast.warning('注册成功但登录受限。请检查后台是否关闭了邮箱验证并启用了 Email Provider。');
         }
       }
     }
