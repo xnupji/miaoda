@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -16,8 +16,18 @@ export default function LoginPage() {
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [activeTab, setActiveTab] = useState('login');
 
   const from = (location.state as { from?: string })?.from || '/';
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const code = searchParams.get('code');
+    if (code) {
+      setRegisterForm(prev => ({ ...prev, invitationCode: code }));
+      setActiveTab('register');
+    }
+  }, [location]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +42,13 @@ export default function LoginPage() {
     setIsLoading(false);
 
     if (error) {
-      toast.error('登录失败：' + error.message);
+      let errorMessage = error.message;
+      if (errorMessage.includes('Email not confirmed')) {
+        errorMessage = '注册邮箱尚未验证，请前往邮箱确认，或联系管理员处理';
+      } else if (errorMessage.includes('Invalid login credentials')) {
+        errorMessage = '用户名或密码错误';
+      }
+      toast.error('登录失败：' + errorMessage);
     } else {
       toast.success('登录成功！');
       navigate(from, { replace: true });
@@ -99,7 +115,7 @@ export default function LoginPage() {
           <CardDescription>基于BSC区块链的去中心化挖矿平台</CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="login" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">登录</TabsTrigger>
               <TabsTrigger value="register">注册</TabsTrigger>

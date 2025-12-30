@@ -16,7 +16,7 @@ export default function InvitationPage() {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const invitationLink = `${window.location.origin}/login?code=${profile?.invitation_code}`;
+  const invitationLink = `${window.location.origin}${import.meta.env.BASE_URL}login?code=${profile?.invitation_code}`;
 
   useEffect(() => {
     loadInvitations();
