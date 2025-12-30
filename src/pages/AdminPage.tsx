@@ -17,7 +17,6 @@ import {
   reviewWithdrawalRequest,
   getAllMasterNodeApplications,
   getPlatformConfig,
-  updateProfile,
   getSystemSetting,
   updateSystemSetting,
   getHTPPrice,
