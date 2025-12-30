@@ -80,7 +80,7 @@ export default function LoginPage() {
     }
 
     setIsLoading(true);
-    const { error } = await signUp(
+    const { data, error } = await signUp(
       registerForm.username,
       registerForm.password,
       registerForm.invitationCode || undefined
@@ -90,12 +90,26 @@ export default function LoginPage() {
     if (error) {
       toast.error('注册失败：' + error.message);
     } else {
-      toast.success('注册成功！正在登录...');
-      // 自动登录
-      setTimeout(async () => {
-        await signIn(registerForm.username, registerForm.password);
+      toast.success('注册成功！');
+      
+      // 如果注册返回了 session，说明不需要邮箱验证，直接跳转
+      if (data?.session) {
         navigate(from, { replace: true });
-      }, 1000);
+      } else {
+        // 否则可能还是需要验证，或者虽然没有 session 但我们尝试自动登录
+        // 注意：如果后台关了验证，signUp 会直接返回 session。
+        // 如果后台开了验证，signUp 返回 user 但 session 为 null。
+        // 为了兼容，如果 session 存在直接跳转。如果不存在，尝试自动登录（可能会失败如果需要验证）
+        
+        // 尝试自动登录（作为 fallback）
+        try {
+            await signIn(registerForm.username, registerForm.password);
+            navigate(from, { replace: true });
+        } catch (e) {
+            // 忽略错误，可能需要邮箱验证
+             toast.info('如果需要邮箱验证，请前往邮箱确认。');
+        }
+      }
     }
   };
 
