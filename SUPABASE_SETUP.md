@@ -13,7 +13,7 @@
 1. 登录您的 [Supabase Dashboard](https://supabase.com/dashboard)。
 2. 选择您的项目。
 3. 在左侧菜单栏中，点击 **Authentication** (图标通常是一个指纹或锁)。
-4. 在二级菜单中，点击 **Providers**。
+4. 在左侧二级菜单的 **CONFIGURATION** 分组下，点击 **Sign In / Providers**。
 
 ### 第二步：配置 Email Provider (核心步骤)
 
