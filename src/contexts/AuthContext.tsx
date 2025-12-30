@@ -24,7 +24,7 @@ interface AuthContextType {
   profile: Profile | null;
   loading: boolean;
   signIn: (username: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (username: string, password: string, invitationCode?: string) => Promise<{ error: Error | null }>;
+  signUp: (username: string, password: string, invitationCode?: string) => Promise<{ data?: { user: User | null; session: any } | null; error: Error | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
