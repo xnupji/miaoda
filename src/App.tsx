@@ -4,6 +4,7 @@ import IntersectObserver from '@/components/common/IntersectObserver';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { Web3Provider } from '@/contexts/Web3Context';
 import { RouteGuard } from '@/components/common/RouteGuard';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { Toaster } from '@/components/ui/sonner';
 import MainLayout from '@/components/layouts/MainLayout';
 import routes from './routes';
@@ -29,30 +30,32 @@ const LayoutWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
 const App: React.FC = () => {
   return (
-    <Router basename={import.meta.env.BASE_URL}>
-      <AuthProvider>
-        <Web3Provider>
-          <RouteGuard>
-            <IntersectObserver />
-            <LayoutWrapper>
-              <Suspense fallback={<LoadingFallback />}>
-                <Routes>
-                  {routes.map((route, index) => (
-                    <Route
-                      key={index}
-                      path={route.path}
-                      element={route.element}
-                    />
-                  ))}
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-              </Suspense>
-            </LayoutWrapper>
-            <Toaster />
-          </RouteGuard>
-        </Web3Provider>
-      </AuthProvider>
-    </Router>
+    <ErrorBoundary>
+      <Router basename={import.meta.env.BASE_URL}>
+        <AuthProvider>
+          <Web3Provider>
+            <RouteGuard>
+              <IntersectObserver />
+              <LayoutWrapper>
+                <Suspense fallback={<LoadingFallback />}>
+                  <Routes>
+                    {routes.map((route, index) => (
+                      <Route
+                        key={index}
+                        path={route.path}
+                        element={route.element}
+                      />
+                    ))}
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Routes>
+                </Suspense>
+              </LayoutWrapper>
+              <Toaster />
+            </RouteGuard>
+          </Web3Provider>
+        </AuthProvider>
+      </Router>
+    </ErrorBoundary>
   );
 };
 
