@@ -1,0 +1,145 @@
+/* stylelint-disable */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here.
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --radius: 0.5rem;
+    /* 科技蓝主题 - 浅色模式 */
+    --background: 210 20% 98%;
+    --foreground: 220 15% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 15% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 15% 10%;
+    --primary: 215 100% 56%; /* 科技蓝 #1F7AFF */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 15% 85%;
+    --secondary-foreground: 220 15% 10%;
+    --muted: 220 15% 92%;
+    --muted-foreground: 220 10% 45%;
+    --accent: 215 100% 92%;
+    --accent-foreground: 215 100% 56%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 15% 88%;
+    --input: 220 15% 88%;
+    --ring: 215 100% 56%;
+    --chart-1: 215 100% 56%;
+    --chart-2: 195 100% 50%;
+    --chart-3: 235 100% 65%;
+    --chart-4: 175 70% 50%;
+    --chart-5: 255 80% 60%;
+    --sidebar-background: 220 18% 11%; /* 深空灰 */
+    --sidebar-foreground: 210 20% 98%;
+    --sidebar-primary: 215 100% 56%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 18% 18%;
+    --sidebar-accent-foreground: 210 20% 98%;
+    --sidebar-border: 220 18% 15%;
+    --sidebar-ring: 215 100% 56%;
+  }
+
+  .dark {
+    /* 深空灰主题 - 暗色模式 */
+    --background: 220 18% 11%; /* 深空灰 #1C1C24 */
+    --foreground: 210 20% 98%;
+    --card: 220 18% 15%;
+    --card-foreground: 210 20% 98%;
+    --popover: 220 18% 15%;
+    --popover-foreground: 210 20% 98%;
+    --primary: 215 100% 56%; /* 科技蓝 #1F7AFF */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 18% 25%;
+    --secondary-foreground: 210 20% 98%;
+    --muted: 220 18% 20%;
+    --muted-foreground: 220 10% 60%;
+    --accent: 220 18% 18%;
+    --accent-foreground: 215 100% 56%;
+    --destructive: 0 62.8% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 18% 22%;
+    --input: 220 18% 22%;
+    --ring: 215 100% 56%;
+    --chart-1: 215 100% 56%;
+    --chart-2: 195 100% 50%;
+    --chart-3: 235 100% 65%;
+    --chart-4: 175 70% 50%;
+    --chart-5: 255 80% 60%;
+    --sidebar-background: 220 18% 11%;
+    --sidebar-foreground: 210 20% 98%;
+    --sidebar-primary: 215 100% 56%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 18% 18%;
+    --sidebar-accent-foreground: 210 20% 98%;
+    --sidebar-border: 220 18% 15%;
+    --sidebar-ring: 215 100% 56%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  /* 发光边框效果 */
+  .glow-border {
+    box-shadow: 0 0 10px hsl(var(--primary) / 0.5), 0 0 20px hsl(var(--primary) / 0.3);
+  }
+
+  .glow-border-strong {
+    box-shadow: 0 0 15px hsl(var(--primary) / 0.7), 0 0 30px hsl(var(--primary) / 0.5), 0 0 45px hsl(var(--primary) / 0.3);
+  }
+
+  /* 渐变背景 */
+  .gradient-bg {
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.1), hsl(var(--accent) / 0.1));
+  }
+
+  .gradient-bg-strong {
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--chart-3)));
+  }
+
+  /* 渐变文字 */
+  .gradient-text {
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--chart-3)));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  /* 脉冲动画 */
+  @keyframes pulse-glow {
+    0%, 100% {
+      box-shadow: 0 0 10px hsl(var(--primary) / 0.5);
+    }
+    50% {
+      box-shadow: 0 0 20px hsl(var(--primary) / 0.8), 0 0 30px hsl(var(--primary) / 0.5);
+    }
+  }
+
+  .pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  /* 悬停发光 */
+  .hover-glow {
+    transition: box-shadow 0.3s ease;
+  }
+
+  .hover-glow:hover {
+    box-shadow: 0 0 15px hsl(var(--primary) / 0.6), 0 0 25px hsl(var(--primary) / 0.4);
+  }
+}

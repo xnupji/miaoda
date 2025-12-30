@@ -5,12 +5,12 @@
     import autoprefixer from "autoprefixer";
     import fs from "fs/promises";
     import path from "path";
-    import {
-      makeTagger,
-      injectedGuiListenerPlugin,
-      injectOnErrorPlugin,
-      monitorPlugin
-    } from "miaoda-sc-plugin";
+    // import {
+    //   makeTagger,
+    //   injectedGuiListenerPlugin,
+    //   injectOnErrorPlugin,
+    //   monitorPlugin
+    // } from "miaoda-sc-plugin";
 
     const env: ConfigEnv = { command: "serve", mode: "development" };
     const configFile = path.resolve(__dirname, "vite.config.ts");
@@ -20,11 +20,11 @@
     export default defineConfig({
       ...userConfig,
       plugins: [
-        makeTagger(),
-        injectedGuiListenerPlugin({
-          path: 'https://resource-static.cdn.bcebos.com/common/v2/injected.js'
-        }),
-        injectOnErrorPlugin(),
+        // makeTagger(),
+        // injectedGuiListenerPlugin({
+        //   path: 'https://resource-static.cdn.bcebos.com/common/v2/injected.js'
+        // }),
+        // injectOnErrorPlugin(),
         ...(userConfig?.plugins || []),
         
 {
