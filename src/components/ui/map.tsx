@@ -118,24 +118,24 @@ const currentRef = useRef(null);
 
 const _options = useMemo(() => {
     return { ...defaultOption, ...option };
-}, [option]);
+  }, [option?.address, option?.lat, option?.lng, option?.zoom]);
 
-const contextValue = useMemo<MapContextProps>(
+  const contextValue = useMemo<MapContextProps>(
     () => ({
-    address: option?.address,
+      address: option?.address,
     }),
     [option?.address]
-);
+  );
 
-const initMap = useCallback(() => {
+  const initMap = useCallback(() => {
     if (!mapRef.current) return;
 
     let map = currentRef.current;
 
     if (!map) {
-    // Create map instance
-    map = new (window as any).BMapGL.Map(mapRef.current);
-    currentRef.current = map;
+      // Create map instance
+      map = new (window as any).BMapGL.Map(mapRef.current);
+      currentRef.current = map;
     }
 
     // Clear overlays
@@ -143,8 +143,8 @@ const initMap = useCallback(() => {
 
     // Set map center coordinates and map level
     const center = new (window as any).BMapGL.Point(
-    _options?.lng,
-    _options?.lat
+      _options?.lng,
+      _options?.lat
     );
 
     map.centerAndZoom(center, _options?.zoom);
@@ -152,7 +152,7 @@ const initMap = useCallback(() => {
     // Add marker
     const marker = new (window as any).BMapGL.Marker(center);
     map.addOverlay(marker);
-}, [_options]);
+  }, [_options.lng, _options.lat, _options.zoom]);
 
 useEffect(() => {
     // Check if Baidu Map API is loaded

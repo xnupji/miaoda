@@ -11,7 +11,10 @@ export async function getProfile(userId: string): Promise<Profile | null> {
     .maybeSingle();
 
   if (error) {
-    console.error('获取用户信息失败:', error);
+    // 忽略找不到记录的错误，因为新用户可能还没有 profile
+    if (error.code !== 'PGRST116') {
+        console.error('获取用户信息失败:', error);
+    }
     return null;
   }
   return data;

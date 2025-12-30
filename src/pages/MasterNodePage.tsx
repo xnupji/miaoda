@@ -70,7 +70,7 @@ export default function MasterNodePage() {
     }
   };
 
-  const progressPercentage = application
+  const progressPercentage = application && application.target_wallets > 0
     ? (application.activated_wallets / application.target_wallets) * 100
     : 0;
 
