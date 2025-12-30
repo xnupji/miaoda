@@ -98,16 +98,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // 如果有邀请码，处理邀请关系
       if (invitationCode && data.user) {
         // 查找邀请人
-        // ... (省略了，因为 API 文件里没有暴露 inviteUser 而是通过 supabase triggers 或者其他逻辑？
-        // 实际上之前的代码里这里是省略的。
-        // 我们只关注返回值
-      }
-      
-      return { data, error: null };
-    } catch (error) {
-      return { error: error as Error };
-    }
-  };
         const { data: inviter } = await supabase
           .from('profiles')
           .select('id')
@@ -158,8 +148,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }, 2000);
         }
       }
-
-      return { error: null };
+      
+      return { data, error: null };
     } catch (error) {
       return { error: error as Error };
     }
