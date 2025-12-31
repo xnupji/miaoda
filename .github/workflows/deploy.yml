@@ -35,6 +35,9 @@ jobs:
         run: pnpm install
 
       - name: Build
+        env:
+          VITE_SUPABASE_URL: https://pwlgtiiiapiahtwtvojz.supabase.co
+          VITE_SUPABASE_ANON_KEY: sb_publishable_OBcHJSvgjz9K_s09n4UHKA_enjz0h1x
         run: |
           pnpm run build
           cp dist/index.html dist/404.html

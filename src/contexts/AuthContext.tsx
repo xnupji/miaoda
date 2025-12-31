@@ -69,13 +69,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (username: string, password: string) => {
     try {
-      const email = `${username}@miaoda.com`;
-      const { error } = await supabase.auth.signInWithPassword({
+      const signIn = async (username: string, password: string) => {
+    try {
+      const email = `${username.trim().toLowerCase()}@miaoda.com`;
+      console.log('Attempting login with:', { username, email });
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Login failed:', error);
+        throw error;
+      }
       return { error: null };
     } catch (error) {
       return { error: error as Error };
@@ -84,19 +90,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (username: string, password: string, invitationCode?: string) => {
     try {
-      const email = `${username}@miaoda.com`;
+      const normalizedUsername = username.trim().toLowerCase();
+      const email = `${normalizedUsername}@miaoda.com`;
+      console.log('Attempting registration with:', { username: normalizedUsername, email });
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            username,
+            username: normalizedUsername,
             invitation_code: invitationCode || null,
           },
         },
       });
 
-      if (error) throw error;
+      if (error) {
+         console.error('Registration failed:', error);
+         throw error;
+      }
+      
+      console.log('Registration success:', data);
 
       // 如果有邀请码，处理邀请关系
       if (invitationCode && data.user) {

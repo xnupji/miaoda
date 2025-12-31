@@ -135,11 +135,12 @@ export default function LoginPage() {
               <TabsTrigger value="register">注册</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="login">
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="login-username">用户名</Label>
-                  <Input
+            <div key={activeTab} className="mt-4">
+              <TabsContent value="login" forceMount={true} hidden={activeTab !== 'login'}>
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="login-username">用户名</Label>
+                    <Input
                     id="login-username"
                     type="text"
                     placeholder="请输入用户名"
@@ -160,16 +161,16 @@ export default function LoginPage() {
                   />
                 </div>
                 <Button type="submit" className="w-full hover-glow" disabled={isLoading}>
-                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  登录
-                </Button>
-              </form>
-            </TabsContent>
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    登录
+                  </Button>
+                </form>
+              </TabsContent>
 
-            <TabsContent value="register">
-              <form onSubmit={handleRegister} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="register-username">用户名</Label>
+              <TabsContent value="register" forceMount={true} hidden={activeTab !== 'register'}>
+                <form onSubmit={handleRegister} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="register-username">用户名</Label>
                   <Input
                     id="register-username"
                     type="text"
@@ -213,11 +214,12 @@ export default function LoginPage() {
                   />
                 </div>
                 <Button type="submit" className="w-full hover-glow" disabled={isLoading}>
-                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  注册
-                </Button>
-              </form>
-            </TabsContent>
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    注册
+                  </Button>
+                </form>
+              </TabsContent>
+            </div>
           </Tabs>
         </CardContent>
       </Card>
