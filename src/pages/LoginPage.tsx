@@ -75,7 +75,7 @@ export default function LoginPage() {
 
     // 验证用户名格式
     if (!/^[a-zA-Z0-9_]+$/.test(registerForm.username)) {
-      toast.error('用户名只能包含字母、数字和下划线');
+      toast.error('用户名只能包含字母、数字和下划线，请勿输入邮箱地址');
       return;
     }
 
