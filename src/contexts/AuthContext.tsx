@@ -69,10 +69,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (username: string, password: string) => {
     try {
-      const signIn = async (username: string, password: string) => {
-    try {
       const email = `${username.trim().toLowerCase()}@miaoda.com`;
-      console.log('Attempting login with:', { username, email });
+      // console.log('Attempting login with:', { username, email });
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -92,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const normalizedUsername = username.trim().toLowerCase();
       const email = `${normalizedUsername}@miaoda.com`;
-      console.log('Attempting registration with:', { username: normalizedUsername, email });
+      // console.log('Attempting registration with:', { username: normalizedUsername, email });
       
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -110,7 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
          throw error;
       }
       
-      console.log('Registration success:', data);
+      // console.log('Registration success:', data);
 
       // 如果有邀请码，处理邀请关系
       if (invitationCode && data.user) {
