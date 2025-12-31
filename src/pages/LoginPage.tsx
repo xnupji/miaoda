@@ -44,7 +44,7 @@ export default function LoginPage() {
     if (error) {
       let errorMessage = error.message;
       if (errorMessage.includes('Email not confirmed')) {
-        errorMessage = '注册邮箱尚未验证，请前往邮箱确认，或联系管理员处理';
+        errorMessage = '账号未验证（如果是旧账号，请在后台删除该用户后重新注册；如果是新账号，请检查后台“Email Provider”是否已开启）';
       } else if (errorMessage.includes('Invalid login credentials')) {
         errorMessage = '用户名或密码错误';
       }
