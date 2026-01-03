@@ -1,53 +1,37 @@
-# Supabase 认证配置指南 (解决登录/注册问题)
+# Supabase 配置指南：启用 Email Provider
 
-为了确保您的应用能够正常进行用户注册和登录，请务必按照以下步骤在 Supabase 后台进行配置。
+为了解决“注册成功但无法登录”或“White Screen”问题，必须确保 Supabase 后台的 Email Provider 已正确配置。
 
-## ⚠️ 关键提示
+## 第一步：进入 Authentication 设置
 
-大多数“注册后无法登录”或“注册无反应”的问题，都是因为 **Email Provider 未启用** 或 **邮箱验证未关闭** 导致的。
+1. 登录 [Supabase Dashboard](https://supabase.com/dashboard)。
+2. 进入您的项目。
+3. 在左侧菜单栏点击 **Authentication** 图标（像一个指纹或锁的图标）。
+4. 在二级菜单中点击 **Providers**。
 
-## 🛠️ 配置步骤
+## 第二步：配置 Email Provider
 
-### 第一步：进入认证设置
+1. 在 Providers 列表中找到 **Email**。
+2. 点击 **Email** 展开设置。
+3. 确保 **Enable Email provider** 开关是 **开启 (ON/Green)** 状态。
+4. **关键设置**：
+   - **Confirm email**: 建议 **关闭 (OFF)**。如果开启，用户注册后必须点击邮件链接才能登录，这会导致“注册成功但无法登录”的问题。
+   - **Secure email change**: 建议 **开启 (ON)**。
 
-1. 登录您的 [Supabase Dashboard](https://supabase.com/dashboard)。
-2. 选择您的项目。
-3. 在左侧菜单栏中，点击 **Authentication** (图标通常是一个指纹或锁)。
-4. 在左侧二级菜单的 **CONFIGURATION** 分组下，点击 **Sign In / Providers**。
+5. 点击右下角的 **Save** 保存设置。
 
-### 第二步：配置 Email Provider (核心步骤)
+## 第三步：检查 URL Configuration (可选但推荐)
 
-1. 在 Providers 列表中，找到 **Email** 并点击它以展开设置。
-2. **启用服务**：确保 **Enable Email provider** 开关处于 **开启 (绿色)** 状态。
-   - *如果它是灰色的，请务必打开它。*
-3. **关闭邮箱验证**：找到 **Confirm email** 选项，将其设置为 **关闭 (灰色)**。
-   - *原因：如果您没有配置自定义 SMTP 邮件服务器，用户将无法收到验证邮件。关闭此选项可让用户注册后直接登录，无需验证。*
-4. **保存设置 (最容易被忽略的一步！)**：
-   - 更改上述设置后，务必点击右下角或设置面板底部的 **Save** 按钮。
-   - *注意：如果按钮是绿色的，说明有未保存的更改；如果是灰色的，说明已保存。*
-
-### 第三步：清理旧数据 (推荐)
-
-如果您之前尝试注册过账号但失败了，建议删除这些“半成品”账号，以免造成干扰：
-
-1. 点击左侧菜单的 **Authentication** -> **Users**。
-2. 勾选之前注册失败的邮箱地址。
-3. 点击 **Delete user** 删除它们。
-
-## ✅ 验证测试
-
-完成上述设置后：
-
-1. 回到您的应用注册页面。
-2. 使用一个**新的**邮箱地址进行注册。
-3. 注册成功后，系统应自动跳转或允许您直接登录，而不会提示“Email not confirmed”。
+1. 在 Authentication 菜单下点击 **URL Configuration**。
+2. 确保 **Site URL** 设置为您项目的上线域名（例如 GitHub Pages 的地址）。
+3. 如果您在本地开发，确保添加了 `http://localhost:5173` 到 **Redirect URLs**。
 
 ---
 
-## 常见问题排查
+# 常见问题解决
 
-- **Q: 为什么我改了设置还是提示 "Email not confirmed"?**
-  - A: 可以在 Supabase 的 **Authentication** -> **Users** 列表中查看该用户的状态。如果 `Last Sign In` 是空的且没有 `Verified` 标记，说明该账号是在您修改设置**之前**创建的。请删除该账号重新注册。
+## 为什么注册后是白屏？
+这是因为前端代码尝试自动登录，但如果 Supabase 要求“Confirm email”，登录会失败。**关闭 Confirm email** 选项即可解决。
 
-- **Q: 注册时转圈然后没反应？**
-  - A: 请检查浏览器的控制台 (F12 -> Console)，如果有红色报错，请截图反馈。通常这与网络连接或 Supabase 服务状态有关。
+## 为什么后台显示的是邮箱？
+系统为了兼容 Supabase 的认证机制，会自动将您的用户名转换为 `用户名@miaoda.com` 的虚拟邮箱格式。这是正常现象，您可以忽略后台的邮箱显示，用户在前台只需要输入用户名即可。

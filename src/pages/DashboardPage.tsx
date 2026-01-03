@@ -52,17 +52,17 @@ export default function DashboardPage() {
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     const miningAmount = Math.random() * 10 + 5; // 5-15 HTP
-    const success = await performMining(miningAmount);
+    const result = await performMining(miningAmount);
 
     setIsMining(false);
 
-    if (success) {
+    if (result.success) {
       toast.success(`挖矿成功！获得 ${miningAmount.toFixed(2)} HTP`);
       setHasMined(true);
       await refreshProfile();
       await loadData();
     } else {
-      toast.error('挖矿失败，请稍后重试');
+      toast.error(result.message || '挖矿失败，请稍后重试');
     }
   };
 
@@ -148,7 +148,7 @@ export default function DashboardPage() {
           {isConnected && !profile?.wallet_address && (
             <div className="flex items-center gap-2 p-3 rounded-lg bg-accent/50 border border-border">
               <AlertCircle className="w-5 h-5 text-primary" />
-              <p className="text-sm">请先在钱包管理页面绑定钱包地址</p>
+              <p className="text-sm">建议绑定钱包地址以确保资产安全</p>
             </div>
           )}
 
@@ -165,7 +165,7 @@ export default function DashboardPage() {
             <Button
               size="lg"
               onClick={handleMining}
-              disabled={isMining || hasMined || !isConnected || !profile?.wallet_address}
+              disabled={isMining || hasMined || !isConnected}
               className="px-6 py-5 text-base hover-glow"
             >
               {isMining && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}

@@ -114,9 +114,9 @@ option?: {
 };
 }) => {
 const mapRef = useRef<HTMLDivElement>(null);
-const currentRef = useRef(null);
+  const currentRef = useRef<any>(null);
 
-const _options = useMemo(() => {
+  const _options = useMemo(() => {
     return { ...defaultOption, ...option };
   }, [option?.address, option?.lat, option?.lng, option?.zoom]);
 
@@ -139,7 +139,9 @@ const _options = useMemo(() => {
     }
 
     // Clear overlays
-    map.clearOverlays();
+    if (map) {
+      map.clearOverlays();
+    }
 
     // Set map center coordinates and map level
     const center = new (window as any).BMapGL.Point(
@@ -147,11 +149,15 @@ const _options = useMemo(() => {
       _options?.lat
     );
 
-    map.centerAndZoom(center, _options?.zoom);
+    if (map) {
+      map.centerAndZoom(center, _options?.zoom);
+    }
 
     // Add marker
     const marker = new (window as any).BMapGL.Marker(center);
-    map.addOverlay(marker);
+    if (map) {
+      map.addOverlay(marker);
+    }
   }, [_options.lng, _options.lat, _options.zoom]);
 
 useEffect(() => {

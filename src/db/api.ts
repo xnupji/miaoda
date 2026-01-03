@@ -144,14 +144,20 @@ export async function checkTodayMining(): Promise<boolean> {
   return !!data;
 }
 
+export interface MiningResult {
+  success: boolean;
+  message?: string;
+  data?: any;
+}
+
 // 执行挖矿
-export async function performMining(amount: number): Promise<boolean> {
+export async function performMining(amount: number): Promise<MiningResult> {
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return false;
+  if (!user) return { success: false, message: '未登录' };
 
   const today = new Date().toISOString().split('T')[0];
 
-  // 创建挖矿记录
+  // 1. 创建挖矿记录
   const { error: miningError } = await supabase
     .from('mining_records')
     .insert({
@@ -162,19 +168,23 @@ export async function performMining(amount: number): Promise<boolean> {
 
   if (miningError) {
     console.error('创建挖矿记录失败:', miningError);
-    return false;
+    return { success: false, message: '创建挖矿记录失败: ' + miningError.message };
   }
 
-  // 更新余额
+  // 2. 更新余额
+  // 尝试使用 RPC
   const { error: balanceError } = await supabase.rpc('increment_balance', {
     user_id: user.id,
     amount,
   });
 
   if (balanceError) {
-    // 如果RPC不存在，使用直接更新
+    console.warn('RPC调用失败，尝试直接更新:', balanceError);
+    // 如果RPC不存在或失败，使用直接更新（作为后备方案）
     const profile = await getCurrentProfile();
-    if (!profile) return false;
+    if (!profile) {
+      return { success: false, message: '获取用户信息失败，请稍后重试' };
+    }
 
     const { error: updateError } = await supabase
       .from('profiles')
@@ -183,21 +193,23 @@ export async function performMining(amount: number): Promise<boolean> {
 
     if (updateError) {
       console.error('更新余额失败:', updateError);
-      return false;
+      return { success: false, message: '更新余额失败: ' + updateError.message };
     }
   }
 
-  // 创建交易记录
-  await supabase.from('transactions').insert({
+  // 3. 创建交易记录 (非阻塞，失败不影响挖矿结果)
+  supabase.from('transactions').insert({
     user_id: user.id,
     type: 'mining',
     amount,
     token_type: 'HTP',
     status: 'completed',
     description: '每日挖矿奖励',
+  }).then(({ error }) => {
+    if (error) console.error('创建交易记录失败:', error);
   });
 
-  return true;
+  return { success: true };
 }
 
 // 获取挖矿记录

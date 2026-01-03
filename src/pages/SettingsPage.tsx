@@ -1,10 +1,41 @@
+import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/db/supabase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Settings as SettingsIcon, User, Shield, Sparkles } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
+import { Settings as SettingsIcon, User, Shield, Sparkles, KeyRound, Loader2 } from 'lucide-react';
 
 export default function SettingsPage() {
   const { profile } = useAuth();
+  const [passwordForm, setPasswordForm] = useState({ password: '', confirmPassword: '' });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordForm.password !== passwordForm.confirmPassword) {
+      toast.error('两次输入的密码不一致');
+      return;
+    }
+    if (passwordForm.password.length < 6) {
+      toast.error('密码长度至少为6位');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    const { error } = await supabase.auth.updateUser({ password: passwordForm.password });
+    setIsChangingPassword(false);
+
+    if (error) {
+      toast.error('修改密码失败: ' + error.message);
+    } else {
+      toast.success('密码修改成功');
+      setPasswordForm({ password: '', confirmPassword: '' });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -26,7 +57,7 @@ export default function SettingsPage() {
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">用户名</p>
-              <p className="font-medium">{profile?.username}</p>
+              <p className="font-medium">{profile?.username || '未设置'}</p>
             </div>
 
             <div className="space-y-2">
@@ -44,7 +75,7 @@ export default function SettingsPage() {
                     主节点
                   </Badge>
                 )}
-                {profile?.role === 'user' && (
+                {(!profile?.role || profile?.role === 'user') && (
                   <Badge variant="secondary">普通用户</Badge>
                 )}
               </div>
@@ -52,13 +83,13 @@ export default function SettingsPage() {
 
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">邀请码</p>
-              <p className="font-mono font-medium">{profile?.invitation_code}</p>
+              <p className="font-mono font-medium">{profile?.invitation_code || '未生成'}</p>
             </div>
 
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">注册时间</p>
               <p className="font-medium">
-                {profile?.created_at && new Date(profile.created_at).toLocaleString('zh-CN')}
+                {profile?.created_at ? new Date(profile.created_at).toLocaleString('zh-CN') : '未知'}
               </p>
             </div>
 
@@ -76,6 +107,45 @@ export default function SettingsPage() {
               </p>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* 修改密码 */}
+      <Card className="glow-border">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <KeyRound className="w-6 h-6 text-primary" />
+            修改密码
+          </CardTitle>
+          <CardDescription>更新您的登录密码</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
+            <div className="space-y-2">
+              <Label htmlFor="new-password">新密码</Label>
+              <Input
+                id="new-password"
+                type="password"
+                placeholder="至少6位"
+                value={passwordForm.password}
+                onChange={(e) => setPasswordForm({ ...passwordForm, password: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">确认新密码</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                placeholder="再次输入新密码"
+                value={passwordForm.confirmPassword}
+                onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+              />
+            </div>
+            <Button type="submit" disabled={isChangingPassword}>
+              {isChangingPassword && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              修改密码
+            </Button>
+          </form>
         </CardContent>
       </Card>
 

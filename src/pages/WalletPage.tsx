@@ -227,14 +227,14 @@ export default function WalletPage() {
         </CardContent>
       </Card>
 
-      {/* 绑定钱包地址 */}
+      {/* 绑定钱包地址 (可选) */}
       <Card className="glow-border">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <LinkIcon className="w-6 h-6 text-primary" />
-            绑定钱包地址
+            绑定钱包地址 (可选)
           </CardTitle>
-          <CardDescription>将您的钱包地址绑定到账户，用于接收代币</CardDescription>
+          <CardDescription>您可以绑定常用钱包地址，也可以在提币时手动输入</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {profile?.wallet_address ? (
@@ -245,18 +245,21 @@ export default function WalletPage() {
                   <p className="font-mono text-sm mt-2 break-all">{profile.wallet_address}</p>
                 </AlertDescription>
               </Alert>
-              <p className="text-sm text-muted-foreground">
-                钱包地址已绑定，如需更换请联系管理员。
-              </p>
+              <Button 
+                variant="outline" 
+                onClick={handleBindWallet}
+                disabled={!isConnected || !isCorrectNetwork || binding}
+                className="w-full"
+              >
+                {binding && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                更新绑定地址
+              </Button>
             </div>
           ) : (
             <div className="space-y-4">
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  请先连接钱包，然后绑定钱包地址。绑定后才能进行挖矿和提币操作。
-                </AlertDescription>
-              </Alert>
+              <p className="text-sm text-muted-foreground">
+                当前未绑定钱包地址。您可以选择绑定当前连接的钱包，方便后续操作。
+              </p>
               <Button
                 onClick={handleBindWallet}
                 disabled={!isConnected || !isCorrectNetwork || binding}
@@ -283,8 +286,8 @@ export default function WalletPage() {
         <CardContent>
           <Dialog>
             <DialogTrigger asChild>
-              <Button className="w-full hover-glow" size="lg" disabled={!profile?.wallet_address}>
-                {!profile?.wallet_address ? '请先绑定钱包地址' : '申请提币'}
+              <Button className="w-full hover-glow" size="lg">
+                申请提币
               </Button>
             </DialogTrigger>
             <DialogContent>

@@ -34,7 +34,7 @@
 
     // 包装原来的 send 方法
     const _send = server.ws.send;
-    server.ws.send = (payload) => {
+    server.ws.send = (payload: any) => {
       if (hmrEnabled) {
         return _send.call(server.ws, payload);
       } else {
@@ -112,15 +112,14 @@
     };
   }
 },
-,
-        monitorPlugin(
-          {
-            scriptSrc: 'https://resource-static.cdn.bcebos.com/sentry/browser.sentry.min.js',
-            sentryDsn: 'https://e3c07b90fcb5207f333d50ac24a99d3e@sentry.miaoda.cn/233',
-            environment: 'undefined',
-            appId: 'app-8jbv0fvmkphd'
-          }
-        )
+        // monitorPlugin(
+//   {
+//     scriptSrc: 'https://resource-static.cdn.bcebos.com/sentry/browser.sentry.min.js',
+//     sentryDsn: 'https://e3c07b90fcb5207f333d50ac24a99d3e@sentry.miaoda.cn/233',
+//     environment: 'undefined',
+//     appId: 'app-8jbv0fvmkphd'
+//   }
+// )
       ]
     });
     

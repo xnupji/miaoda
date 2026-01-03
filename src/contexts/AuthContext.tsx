@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { supabase } from '@/db/supabase';
-import type { User } from '@supabase/supabase-js';
+import type { User, AuthChangeEvent, Session } from '@supabase/supabase-js';
 import type { Profile } from '@/types/types';
 
 export async function getProfile(userId: string): Promise<Profile | null> {
@@ -47,15 +47,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
-        getProfile(session.user.id).then(setProfile);
+        getProfile(session.user.id).then((profile) => {
+          setProfile(profile);
+          setLoading(false);
+        });
+      } else {
+        setLoading(false);
       }
-      setLoading(false);
     });
     // In this function, do NOT use any await calls. Use `.then()` instead to avoid deadlocks.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       setUser(session?.user ?? null);
       if (session?.user) {
         getProfile(session.user.id).then(setProfile);
@@ -71,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const email = `${username.trim().toLowerCase()}@miaoda.com`;
       // console.log('Attempting login with:', { username, email });
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -110,59 +114,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // console.log('Registration success:', data);
 
-      // 如果有邀请码，处理邀请关系
-      if (invitationCode && data.user) {
-        // 查找邀请人
-        const { data: inviter } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('invitation_code', invitationCode)
-          .maybeSingle();
+      // 邀请关系现在由数据库触发器 (handle_new_user) 自动处理
+      // 只要 raw_user_meta_data 中包含 invitation_code 即可
 
-        if (inviter) {
-          // 等待新用户profile创建后再创建邀请关系
-          setTimeout(async () => {
-            await supabase.from('invitations').insert({
-              inviter_id: inviter.id,
-              invitee_id: data.user!.id,
-              reward_amount: 10,
-            });
-
-            // 更新邀请人余额和邀请数
-            const { data: inviterProfile } = await supabase
-              .from('profiles')
-              .select('htp_balance, total_invites')
-              .eq('id', inviter.id)
-              .maybeSingle();
-
-            if (inviterProfile) {
-              await supabase
-                .from('profiles')
-                .update({
-                  htp_balance: inviterProfile.htp_balance + 10,
-                  total_invites: inviterProfile.total_invites + 1,
-                })
-                .eq('id', inviter.id);
-
-              // 创建交易记录
-              await supabase.from('transactions').insert({
-                user_id: inviter.id,
-                type: 'invitation_reward',
-                amount: 10,
-                token_type: 'HTP',
-                status: 'completed',
-                description: '邀请奖励',
-              });
-            }
-
-            // 更新被邀请人的invited_by字段
-            await supabase
-              .from('profiles')
-              .update({ invited_by: inviter.id })
-              .eq('id', data.user!.id);
-          }, 2000);
-        }
-      }
       
       return { data, error: null };
     } catch (error) {
