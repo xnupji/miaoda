@@ -155,6 +155,11 @@ export async function performMining(amount: number): Promise<MiningResult> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { success: false, message: '未登录' };
 
+  // Parameter validation to prevent RPC errors
+  if (typeof amount !== 'number' || isNaN(amount) || amount <= 0) {
+    return { success: false, message: '无效的挖矿数量' };
+  }
+
   const today = new Date().toISOString().split('T')[0];
 
   // 1. 创建挖矿记录
