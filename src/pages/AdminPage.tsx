@@ -794,7 +794,6 @@ export default function AdminPage() {
                   <Label htmlFor="newAddress">新的开发者地址</Label>
                   <Input
                     id="newAddress"
-                    type="text"
                     placeholder="输入新的BSC钱包地址"
                     value={newDeveloperAddress}
                     onChange={(e) => setNewDeveloperAddress(e.target.value)}
@@ -1109,6 +1108,10 @@ export default function AdminPage() {
           </div>
         </DialogContent>
       </Dialog>
+      
+      <div className="text-center text-xs text-muted-foreground py-4">
+        Admin Panel v1.1.0 - Deploy: {new Date().toLocaleDateString()}
+      </div>
     </div>
   );
 }
