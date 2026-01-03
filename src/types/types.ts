@@ -122,3 +122,14 @@ export interface SystemSetting {
   updated_at: string;
   updated_by: string | null;
 }
+
+// 公告系统
+export interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  is_active: boolean;
+  priority: 'low' | 'normal' | 'high';
+  created_at: string;
+  created_by?: string;
+}

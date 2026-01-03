@@ -7,9 +7,11 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Sparkles, Wallet, Users, TrendingUp, Loader2, AlertCircle } from 'lucide-react';
-import { checkTodayMining, performMining, getMiningRecords, getHTPPrice } from '@/db/api';
-import type { MiningRecord } from '@/types/types';
+import { checkTodayMining, performMining, getMiningRecords, getHTPPrice, getAnnouncements } from '@/db/api';
+import type { MiningRecord, Announcement } from '@/types/types';
+import { cn } from '@/lib/utils';
 import InvestorsSection from '@/components/InvestorsSection';
+import { Megaphone, X } from 'lucide-react';
 
 export default function DashboardPage() {
   const { profile, refreshProfile } = useAuth();
@@ -19,6 +21,8 @@ export default function DashboardPage() {
   const [recentRecords, setRecentRecords] = useState<MiningRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [htpPrice, setHtpPrice] = useState('0.0100');
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [showAnnouncement, setShowAnnouncement] = useState(true);
 
   useEffect(() => {
     loadData();
@@ -27,11 +31,14 @@ export default function DashboardPage() {
 
   const loadData = async () => {
     setLoading(true);
-    const mined = await checkTodayMining();
+    const [mined, records, announcementsData] = await Promise.all([
+      checkTodayMining(),
+      getMiningRecords(5),
+      getAnnouncements(true) // Only active announcements
+    ]);
     setHasMined(mined);
-
-    const records = await getMiningRecords(5);
     setRecentRecords(records);
+    setAnnouncements(announcementsData);
     setLoading(false);
   };
 
@@ -73,6 +80,40 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-bold gradient-text">欢迎回来，{profile?.username}！</h1>
         <p className="text-muted-foreground mt-1">开始您的每日挖矿之旅</p>
       </div>
+
+      {/* 公告栏 */}
+      {showAnnouncement && announcements.length > 0 && (
+        <Card className="bg-primary/5 border-primary/20 relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
+          <CardHeader className="pb-2 flex flex-row items-start justify-between">
+            <div className="flex items-center gap-2">
+              <Megaphone className="w-5 h-5 text-primary animate-pulse" />
+              <CardTitle className="text-lg">系统公告</CardTitle>
+            </div>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowAnnouncement(false)}>
+              <X className="w-4 h-4" />
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {announcements.map((announcement) => (
+              <div key={announcement.id} className="border-b border-border/50 last:border-0 pb-3 last:pb-0">
+                <div className="flex items-center gap-2 mb-1">
+                  {announcement.priority === 'high' && (
+                    <Badge variant="destructive" className="text-xs px-1 py-0 h-5">重要</Badge>
+                  )}
+                  <h3 className="font-medium">{announcement.title}</h3>
+                  <span className="text-xs text-muted-foreground ml-auto">
+                    {new Date(announcement.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                  {announcement.content}
+                </p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* 统计卡片 */}
       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">

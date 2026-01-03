@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Shield, Users, FileCheck, Network, Loader2, Wallet, Settings, TrendingUp } from 'lucide-react';
 import {
   getAllProfiles,
   updateUserRole,
@@ -20,9 +19,14 @@ import {
   getSystemSetting,
   updateSystemSetting,
   getHTPPrice,
+  getAnnouncements,
+  createAnnouncement,
+  updateAnnouncement,
+  deleteAnnouncement,
 } from '@/db/api';
-import type { Profile, WithdrawalRequest, MasterNodeApplication } from '@/types/types';
+import type { Profile, WithdrawalRequest, MasterNodeApplication, Announcement } from '@/types/types';
 import { supabase } from '@/db/supabase';
+import { Shield, Users, FileCheck, Network, Loader2, Wallet, Settings, TrendingUp, Megaphone, Plus, Pencil, Trash2 } from 'lucide-react';
 
 export default function AdminPage() {
   const [users, setUsers] = useState<Profile[]>([]);
@@ -49,6 +53,15 @@ export default function AdminPage() {
   const [newHtpPrice, setNewHtpPrice] = useState('');
   const [updatingPrice, setUpdatingPrice] = useState(false);
 
+  // 公告管理相关状态
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [announcementDialog, setAnnouncementDialog] = useState<{
+    open: boolean;
+    mode: 'create' | 'edit';
+    data: Partial<Announcement>;
+  }>({ open: false, mode: 'create', data: {} });
+  const [submittingAnnouncement, setSubmittingAnnouncement] = useState(false);
+
   useEffect(() => {
     loadData();
     loadDeveloperAddress();
@@ -65,14 +78,16 @@ export default function AdminPage() {
 
   const loadData = async () => {
     setLoading(true);
-    const [usersData, withdrawalsData, masterNodesData] = await Promise.all([
+    const [usersData, withdrawalsData, masterNodesData, announcementsData] = await Promise.all([
       getAllProfiles(),
       getAllWithdrawalRequests(),
       getAllMasterNodeApplications(),
+      getAnnouncements(false), // Admin views all
     ]);
     setUsers(usersData);
     setWithdrawals(withdrawalsData);
     setMasterNodes(masterNodesData);
+    setAnnouncements(announcementsData);
     setLoading(false);
   };
 
@@ -217,6 +232,70 @@ export default function AdminPage() {
   const pendingWithdrawals = withdrawals.filter(w => w.status === 'pending');
   const pendingMasterNodes = masterNodes.filter(m => m.status === 'pending');
 
+  // 公告管理处理函数
+  const handleCreateAnnouncement = () => {
+    setAnnouncementDialog({
+      open: true,
+      mode: 'create',
+      data: { is_active: true, priority: 'normal' }
+    });
+  };
+
+  const handleEditAnnouncement = (announcement: Announcement) => {
+    setAnnouncementDialog({
+      open: true,
+      mode: 'edit',
+      data: announcement
+    });
+  };
+
+  const handleDeleteAnnouncement = async (id: string) => {
+    if (!confirm('确定要删除这条公告吗？')) return;
+    const success = await deleteAnnouncement(id);
+    if (success) {
+      toast.success('公告已删除');
+      loadData();
+    } else {
+      toast.error('删除失败');
+    }
+  };
+
+  const submitAnnouncement = async () => {
+    if (!announcementDialog.data.title || !announcementDialog.data.content) {
+      toast.error('请填写标题和内容');
+      return;
+    }
+
+    setSubmittingAnnouncement(true);
+    let success = false;
+
+    if (announcementDialog.mode === 'create') {
+      success = await createAnnouncement({
+        title: announcementDialog.data.title,
+        content: announcementDialog.data.content,
+        is_active: announcementDialog.data.is_active ?? true,
+        priority: announcementDialog.data.priority || 'normal',
+      });
+    } else {
+      if (!announcementDialog.data.id) return;
+      success = await updateAnnouncement(announcementDialog.data.id, {
+        title: announcementDialog.data.title,
+        content: announcementDialog.data.content,
+        is_active: announcementDialog.data.is_active,
+        priority: announcementDialog.data.priority,
+      });
+    }
+
+    setSubmittingAnnouncement(false);
+    if (success) {
+      toast.success(announcementDialog.mode === 'create' ? '公告发布成功' : '公告更新成功');
+      setAnnouncementDialog(prev => ({ ...prev, open: false }));
+      loadData();
+    } else {
+      toast.error('操作失败');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -292,6 +371,10 @@ export default function AdminPage() {
             {pendingMasterNodes.length > 0 && (
               <Badge variant="destructive" className="ml-2">{pendingMasterNodes.length}</Badge>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="announcements">
+            <Megaphone className="w-4 h-4 mr-2" />
+            公告中心
           </TabsTrigger>
           <TabsTrigger value="settings">
             <Settings className="w-4 h-4 mr-2" />
@@ -598,6 +681,80 @@ export default function AdminPage() {
           </Card>
         </TabsContent>
 
+        {/* 公告管理 */}
+        <TabsContent value="announcements" className="space-y-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>公告管理</CardTitle>
+                <CardDescription>发布和管理系统公告</CardDescription>
+              </div>
+              <Button onClick={handleCreateAnnouncement} className="hover-glow">
+                <Plus className="w-4 h-4 mr-2" />
+                发布公告
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>标题</TableHead>
+                      <TableHead>优先级</TableHead>
+                      <TableHead>状态</TableHead>
+                      <TableHead>发布时间</TableHead>
+                      <TableHead className="text-right">操作</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {announcements.map((announcement) => (
+                      <TableRow key={announcement.id}>
+                        <TableCell className="font-medium">{announcement.title}</TableCell>
+                        <TableCell>
+                          <Badge variant={announcement.priority === 'high' ? 'destructive' : announcement.priority === 'low' ? 'secondary' : 'default'}>
+                            {announcement.priority === 'high' ? '重要' : announcement.priority === 'low' ? '低' : '普通'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {announcement.is_active ? (
+                            <Badge className="bg-green-500 hover:bg-green-600">已发布</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-muted-foreground">草稿/下架</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {new Date(announcement.created_at).toLocaleString('zh-CN')}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button variant="ghost" size="icon" onClick={() => handleEditAnnouncement(announcement)}>
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => handleDeleteAnnouncement(announcement.id)}>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {announcements.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                          暂无公告
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* 开发者设置 */}
         <TabsContent value="settings">
           <div className="space-y-4">
@@ -870,6 +1027,71 @@ export default function AdminPage() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* 公告编辑对话框 */}
+      <Dialog open={announcementDialog.open} onOpenChange={(open) => setAnnouncementDialog(prev => ({ ...prev, open }))}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{announcementDialog.mode === 'create' ? '发布新公告' : '编辑公告'}</DialogTitle>
+            <DialogDescription>
+              公告发布后所有用户可见
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>标题</Label>
+              <Input
+                placeholder="请输入公告标题"
+                value={announcementDialog.data.title || ''}
+                onChange={(e) => setAnnouncementDialog(prev => ({ ...prev, data: { ...prev.data, title: e.target.value } }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>内容</Label>
+              <Textarea
+                placeholder="请输入公告内容"
+                className="min-h-[150px]"
+                value={announcementDialog.data.content || ''}
+                onChange={(e) => setAnnouncementDialog(prev => ({ ...prev, data: { ...prev.data, content: e.target.value } }))}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>优先级</Label>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  value={announcementDialog.data.priority || 'normal'}
+                  onChange={(e) => setAnnouncementDialog(prev => ({ ...prev, data: { ...prev.data, priority: e.target.value as any } }))}
+                >
+                  <option value="low">低</option>
+                  <option value="normal">普通</option>
+                  <option value="high">重要</option>
+                </select>
+              </div>
+              <div className="space-y-2 flex flex-col justify-end pb-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    checked={announcementDialog.data.is_active ?? true}
+                    onChange={(e) => setAnnouncementDialog(prev => ({ ...prev, data: { ...prev.data, is_active: e.target.checked } }))}
+                  />
+                  <span className="text-sm font-medium">立即发布</span>
+                </label>
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setAnnouncementDialog(prev => ({ ...prev, open: false }))}>
+              取消
+            </Button>
+            <Button onClick={submitAnnouncement} disabled={submittingAnnouncement}>
+              {submittingAnnouncement && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {announcementDialog.mode === 'create' ? '发布' : '保存'}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

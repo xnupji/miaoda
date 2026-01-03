@@ -8,6 +8,7 @@ import type {
   WithdrawalRequest,
   PlatformConfig,
   SystemSetting,
+  Announcement,
 } from '@/types/types';
 
 // ==================== 平台配置相关 ====================
@@ -578,4 +579,77 @@ export async function getHTPPrice(): Promise<number> {
     const daysPassed = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
     return 0.01 + (daysPassed * 0.03);
   }
+}
+
+// ==================== 公告系统 ====================
+
+// 获取公告列表 (Admin查看所有, 用户查看active)
+export async function getAnnouncements(onlyActive = true): Promise<Announcement[]> {
+  let query = supabase
+    .from('announcements')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (onlyActive) {
+    query = query.eq('is_active', true);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('获取公告列表失败:', error);
+    return [];
+  }
+
+  return Array.isArray(data) ? data : [];
+}
+
+// 创建公告
+export async function createAnnouncement(announcement: Omit<Announcement, 'id' | 'created_at' | 'created_by'>): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const { error } = await supabase
+    .from('announcements')
+    .insert({
+      ...announcement,
+      created_by: user.id
+    });
+
+  if (error) {
+    console.error('创建公告失败:', error);
+    return false;
+  }
+
+  return true;
+}
+
+// 更新公告
+export async function updateAnnouncement(id: string, updates: Partial<Announcement>): Promise<boolean> {
+  const { error } = await supabase
+    .from('announcements')
+    .update(updates)
+    .eq('id', id);
+
+  if (error) {
+    console.error('更新公告失败:', error);
+    return false;
+  }
+
+  return true;
+}
+
+// 删除公告
+export async function deleteAnnouncement(id: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('announcements')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('删除公告失败:', error);
+    return false;
+  }
+
+  return true;
 }
