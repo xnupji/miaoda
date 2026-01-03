@@ -12,7 +12,12 @@ create table if not exists public.announcements (
 -- Enable RLS
 alter table public.announcements enable row level security;
 
--- Policies
+-- Drop existing policies to avoid errors on re-run
+drop policy if exists "Anyone can view active announcements" on public.announcements;
+drop policy if exists "Admins can view all announcements" on public.announcements;
+drop policy if exists "Admins can insert announcements" on public.announcements;
+drop policy if exists "Admins can update announcements" on public.announcements;
+drop policy if exists "Admins can delete announcements" on public.announcements;
 
 -- Policy: Anyone can view active announcements (for users)
 create policy "Anyone can view active announcements"

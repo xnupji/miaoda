@@ -78,17 +78,32 @@ export default function AdminPage() {
 
   const loadData = async () => {
     setLoading(true);
-    const [usersData, withdrawalsData, masterNodesData, announcementsData] = await Promise.all([
-      getAllProfiles(),
-      getAllWithdrawalRequests(),
-      getAllMasterNodeApplications(),
-      getAnnouncements(false), // Admin views all
-    ]);
-    setUsers(usersData);
-    setWithdrawals(withdrawalsData);
-    setMasterNodes(masterNodesData);
-    setAnnouncements(announcementsData);
-    setLoading(false);
+    try {
+      // Load core data first
+      const [usersData, withdrawalsData, masterNodesData] = await Promise.all([
+        getAllProfiles(),
+        getAllWithdrawalRequests(),
+        getAllMasterNodeApplications(),
+      ]);
+      
+      setUsers(usersData);
+      setWithdrawals(withdrawalsData);
+      setMasterNodes(masterNodesData);
+
+      // Load announcements separately to prevent page crash if table is missing
+      try {
+        const announcementsData = await getAnnouncements(false);
+        setAnnouncements(announcementsData);
+      } catch (err) {
+        console.error('Failed to load announcements (table might be missing):', err);
+        // Do not block the page load
+      }
+    } catch (error) {
+      console.error('Failed to load admin data:', error);
+      toast.error('加载数据失败，请检查网络或权限');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleRoleChange = async (userId: string, newRole: 'user' | 'admin' | 'master_node') => {
