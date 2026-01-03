@@ -114,9 +114,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // console.log('Registration success:', data);
 
-      // 邀请关系现在由数据库触发器 (handle_new_user) 自动处理
-      // 只要 raw_user_meta_data 中包含 invitation_code 即可
-
+      // 邀请奖励逻辑已移至数据库触发器 handle_new_user 处理，
+      // 确保原子性和可靠性，避免前端网络问题导致奖励丢失或重复。
       
       return { data, error: null };
     } catch (error) {
