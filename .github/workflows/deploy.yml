@@ -36,10 +36,11 @@ jobs:
 
       - name: Build
         env:
-          VITE_SUPABASE_URL: https://pwlgtiiiapiahtwtvojz.supabase.co
-          VITE_SUPABASE_ANON_KEY: sb_publishable_OBcHJSvgjz9K_s09n4UHKA_enjz0h1x
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: |
           pnpm run build
+          ls -R dist
           cp dist/index.html dist/404.html
 
       - name: Upload artifact
