@@ -1110,8 +1110,8 @@ export default function AdminPage() {
       </Dialog>
       
       <div className="text-center text-xs text-muted-foreground py-4">
-            Admin Panel v1.1.1 - Deploy: {new Date().toLocaleDateString()}
-          </div>
+        Admin Panel v1.1.2 - Deploy: {new Date().toLocaleDateString()}
+      </div>
     </div>
   );
 }
