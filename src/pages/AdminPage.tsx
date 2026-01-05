@@ -316,7 +316,7 @@ export default function AdminPage() {
       <div>
         <h1 className="text-3xl font-bold gradient-text flex items-center gap-2">
           <Shield className="w-8 h-8" />
-          管理后台
+          管理后台 (v1.2)
         </h1>
         <p className="text-muted-foreground mt-2">管理用户、审核申请和查看统计数据</p>
       </div>
@@ -372,8 +372,12 @@ export default function AdminPage() {
       </div>
 
       {/* 管理标签页 */}
-      <Tabs defaultValue="users" className="space-y-4">
+      <Tabs defaultValue="announcements" className="space-y-4">
         <TabsList>
+          <TabsTrigger value="announcements">
+            <Megaphone className="w-4 h-4 mr-2" />
+            公告中心 (New)
+          </TabsTrigger>
           <TabsTrigger value="users">用户管理</TabsTrigger>
           <TabsTrigger value="withdrawals">
             提币审核
@@ -387,10 +391,7 @@ export default function AdminPage() {
               <Badge variant="destructive" className="ml-2">{pendingMasterNodes.length}</Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="announcements">
-            <Megaphone className="w-4 h-4 mr-2" />
-            公告中心
-          </TabsTrigger>
+
           <TabsTrigger value="settings">
             <Settings className="w-4 h-4 mr-2" />
             开发者设置
@@ -1110,7 +1111,7 @@ export default function AdminPage() {
       </Dialog>
       
       <div className="text-center text-xs text-muted-foreground py-4">
-        Admin Panel v1.1.2 - Deploy: {new Date().toLocaleDateString()}
+        Admin Panel v1.2.0 - Deploy: {new Date().toLocaleDateString()}
       </div>
     </div>
   );
