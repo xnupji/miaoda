@@ -398,6 +398,92 @@ export default function AdminPage() {
           </TabsTrigger>
         </TabsList>
 
+        {/* 公告管理 */}
+        <TabsContent value="announcements">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>公告管理</CardTitle>
+                <CardDescription>发布和管理平台公告</CardDescription>
+              </div>
+              <Button onClick={handleCreateAnnouncement}>
+                <Plus className="w-4 h-4 mr-2" />
+                发布公告
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : announcements.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  暂无公告
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>标题</TableHead>
+                        <TableHead>优先级</TableHead>
+                        <TableHead>状态</TableHead>
+                        <TableHead>发布时间</TableHead>
+                        <TableHead className="text-right">操作</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {announcements.map((announcement) => (
+                        <TableRow key={announcement.id}>
+                          <TableCell className="font-medium">{announcement.title}</TableCell>
+                          <TableCell>
+                            {announcement.priority === 'high' && (
+                              <Badge variant="destructive">重要</Badge>
+                            )}
+                            {announcement.priority === 'normal' && (
+                              <Badge variant="secondary">普通</Badge>
+                            )}
+                            {announcement.priority === 'low' && (
+                              <Badge variant="outline">低</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {announcement.is_active ? (
+                              <Badge variant="success" className="bg-green-500/10 text-green-500">已发布</Badge>
+                            ) : (
+                              <Badge variant="secondary" className="bg-gray-500/10 text-gray-500">草稿</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {new Date(announcement.created_at).toLocaleString('zh-CN')}
+                          </TableCell>
+                          <TableCell className="text-right space-x-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleEditAnnouncement(announcement)}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-red-500 hover:text-red-600"
+                              onClick={() => handleDeleteAnnouncement(announcement.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* 用户管理 */}
         <TabsContent value="users">
           <Card>
