@@ -1,5 +1,6 @@
 import { lazy } from 'react';
 import type { ReactNode } from 'react';
+import { Navigate } from 'react-router-dom';
 
 // 懒加载页面组件
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
