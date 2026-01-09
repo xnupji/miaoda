@@ -11,6 +11,7 @@ create table if not exists airdrop_events (
 
 alter table airdrop_events enable row level security;
 
+drop policy if exists "Users can view their own airdrop events" on airdrop_events;
 create policy "Users can view their own airdrop events"
   on airdrop_events for select
   using (
