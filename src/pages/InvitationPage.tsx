@@ -10,9 +10,10 @@ import { toast } from 'sonner';
 import { Copy, Users, Gift, Loader2 } from 'lucide-react';
 import { getMyInvitations } from '@/db/api';
 import type { Invitation } from '@/types/types';
+import { supabase } from '@/db/supabase';
 
 export default function InvitationPage() {
-  const { profile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -22,11 +23,38 @@ export default function InvitationPage() {
     loadInvitations();
   }, []);
 
+  useEffect(() => {
+    if (!profile?.id) return;
+
+    const channel = supabase
+      .channel(`invitation_changes_${profile.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'invitations',
+          filter: `inviter_id=eq.${profile.id}`,
+        },
+        async (payload) => {
+          const newInvitation = payload.new as Invitation;
+          setInvitations((prev) => [newInvitation, ...prev]);
+          await refreshProfile();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.id, refreshProfile]);
+
   const loadInvitations = async () => {
     setLoading(true);
     const data = await getMyInvitations();
     setInvitations(data);
     setLoading(false);
+    await refreshProfile();
   };
 
   const copyInvitationCode = () => {
@@ -40,6 +68,7 @@ export default function InvitationPage() {
   };
 
   const totalRewards = invitations.reduce((sum, inv) => sum + inv.reward_amount, 0);
+  const inviteCount = invitations.length;
 
   return (
     <div className="space-y-6">
@@ -58,7 +87,7 @@ export default function InvitationPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{profile?.total_invites || 0}</div>
+            <div className="text-2xl font-bold">{inviteCount}</div>
           </CardContent>
         </Card>
 

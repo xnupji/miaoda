@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -23,19 +23,24 @@ import {
   createAnnouncement,
   updateAnnouncement,
   deleteAnnouncement,
+  getAllInteractionSubmissions,
+  updateInteractionSubmissionStatus,
+  triggerAirdrop,
+  reviewMasterNodeApplication,
 } from '@/db/api';
-import type { Profile, WithdrawalRequest, MasterNodeApplication, Announcement } from '@/types/types';
+import type { Profile, WithdrawalRequest, MasterNodeApplication, Announcement, InteractionSubmission } from '@/types/types';
 import { supabase } from '@/db/supabase';
-import { Shield, Users, FileCheck, Network, Loader2, Wallet, Settings, TrendingUp, Megaphone, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Shield, Users, FileCheck, Network, Loader2, Wallet, Settings, TrendingUp, Megaphone, Plus, Pencil, Trash2, ArrowRightLeft } from 'lucide-react';
 
 export default function AdminPage() {
   const [users, setUsers] = useState<Profile[]>([]);
   const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
   const [masterNodes, setMasterNodes] = useState<MasterNodeApplication[]>([]);
+  const [interactions, setInteractions] = useState<InteractionSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [reviewDialog, setReviewDialog] = useState<{
     open: boolean;
-    type: 'withdrawal' | 'masternode' | null;
+    type: 'withdrawal' | 'masternode' | 'interaction' | null;
     id: string | null;
     action: 'approve' | 'reject' | null;
   }>({ open: false, type: null, id: null, action: null });
@@ -80,15 +85,17 @@ export default function AdminPage() {
     setLoading(true);
     try {
       // Load core data first
-      const [usersData, withdrawalsData, masterNodesData] = await Promise.all([
+      const [usersData, withdrawalsData, masterNodesData, interactionsData] = await Promise.all([
         getAllProfiles(),
         getAllWithdrawalRequests(),
         getAllMasterNodeApplications(),
+        getAllInteractionSubmissions(),
       ]);
       
       setUsers(usersData);
       setWithdrawals(withdrawalsData);
       setMasterNodes(masterNodesData);
+      setInteractions(interactionsData);
 
       // Load announcements separately to prevent page crash if table is missing
       try {
@@ -135,6 +142,43 @@ export default function AdminPage() {
 
       if (success) {
         toast.success(reviewDialog.action === 'approve' ? '提币申请已通过' : '提币申请已拒绝');
+        await loadData();
+        setReviewDialog({ open: false, type: null, id: null, action: null });
+        setRejectReason('');
+      } else {
+        toast.error('操作失败');
+      }
+    } else if (reviewDialog.type === 'interaction') {
+      const success = await updateInteractionSubmissionStatus(
+        reviewDialog.id,
+        reviewDialog.action === 'approve' ? 'approved' : 'rejected',
+        reviewDialog.action === 'reject' ? rejectReason : undefined
+      );
+
+      if (success) {
+        toast.success(reviewDialog.action === 'approve' ? '交互提交已通过' : '交互提交已拒绝');
+        if (reviewDialog.action === 'approve' && reviewDialog.id) {
+          const r = await triggerAirdrop(reviewDialog.id);
+          if (r.ok) {
+            toast.success('空投已触发');
+          } else {
+            toast.error('空投触发失败: ' + (r.error || '未知错误'));
+          }
+        }
+        await loadData();
+        setReviewDialog({ open: false, type: null, id: null, action: null });
+        setRejectReason('');
+      } else {
+        toast.error('操作失败');
+      }
+    } else if (reviewDialog.type === 'masternode') {
+      const success = await reviewMasterNodeApplication(
+        reviewDialog.id!,
+        reviewDialog.action === 'approve' ? 'approved' : 'rejected',
+        reviewDialog.action === 'reject' ? rejectReason : undefined
+      );
+      if (success) {
+        toast.success(reviewDialog.action === 'approve' ? '主节点申请已通过' : '主节点申请已拒绝');
         await loadData();
         setReviewDialog({ open: false, type: null, id: null, action: null });
         setRejectReason('');
@@ -246,6 +290,7 @@ export default function AdminPage() {
 
   const pendingWithdrawals = withdrawals.filter(w => w.status === 'pending');
   const pendingMasterNodes = masterNodes.filter(m => m.status === 'pending');
+  const pendingInteractions = interactions.filter(i => i.status === 'pending');
 
   // 公告管理处理函数
   const handleCreateAnnouncement = () => {
@@ -322,7 +367,7 @@ export default function AdminPage() {
       </div>
 
       {/* 统计卡片 */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-5">
         <Card className="glow-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -361,6 +406,18 @@ export default function AdminPage() {
 
         <Card className="glow-border">
           <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <ArrowRightLeft className="w-4 h-4" />
+              待审核交互
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-500">{pendingInteractions.length}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="glow-border">
+          <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">主节点数量</CardTitle>
           </CardHeader>
           <CardContent>
@@ -389,6 +446,12 @@ export default function AdminPage() {
             主节点审核
             {pendingMasterNodes.length > 0 && (
               <Badge variant="destructive" className="ml-2">{pendingMasterNodes.length}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="interactions">
+            交互审核
+            {pendingInteractions.length > 0 && (
+              <Badge variant="destructive" className="ml-2">{pendingInteractions.length}</Badge>
             )}
           </TabsTrigger>
 
@@ -504,6 +567,7 @@ export default function AdminPage() {
                         <TableHead>用户名</TableHead>
                         <TableHead>HTP余额</TableHead>
                         <TableHead>USDT余额</TableHead>
+                        <TableHead>邀请人</TableHead>
                         <TableHead>邀请人数</TableHead>
                         <TableHead>钱包状态</TableHead>
                         <TableHead>注册时间</TableHead>
@@ -517,6 +581,7 @@ export default function AdminPage() {
                           <TableCell className="font-medium">{user.username}</TableCell>
                           <TableCell>{user.htp_balance.toFixed(2)}</TableCell>
                           <TableCell>{user.usdt_balance.toFixed(2)}</TableCell>
+                          <TableCell>{user.invited_by ? (users.find(u => u.id === user.invited_by)?.username || '-') : '-'}</TableCell>
                           <TableCell>{user.total_invites}</TableCell>
                           <TableCell>
                             {user.wallet_activated ? (
@@ -749,11 +814,12 @@ export default function AdminPage() {
                                   <Button
                                     size="sm"
                                     variant="default"
-                                    onClick={async () => {
-                                      // 直接通过，更新用户角色
-                                      await handleRoleChange(application.user_id, 'master_node');
-                                      toast.success('主节点申请已通过');
-                                    }}
+                                    onClick={() => setReviewDialog({
+                                      open: true,
+                                      type: 'masternode',
+                                      id: application.id,
+                                      action: 'approve',
+                                    })}
                                   >
                                     通过
                                   </Button>
@@ -770,6 +836,147 @@ export default function AdminPage() {
                                     拒绝
                                   </Button>
                                 </div>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* 交互审核 */}
+        <TabsContent value="interactions">
+          <Card>
+            <CardHeader>
+              <CardTitle>交互审核</CardTitle>
+              <CardDescription>审核社区和机构的地址交互提交</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : interactions.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  暂无交互提交
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>用户</TableHead>
+                        <TableHead>类型</TableHead>
+                        <TableHead>提交时间</TableHead>
+                        <TableHead>地址数量</TableHead>
+                        <TableHead>状态</TableHead>
+                        <TableHead className="text-right">操作</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {interactions.map((submission) => {
+                        const user = users.find(u => u.id === submission.user_id);
+                        
+                        return (
+                          <TableRow key={submission.id}>
+                            <TableCell className="font-medium">
+                              {user?.username || '未知用户'}
+                            </TableCell>
+                            <TableCell>
+                              {submission.type === 'community' ? (
+                                <Badge variant="outline">社区交互</Badge>
+                              ) : (
+                                <Badge variant="outline" className="border-primary text-primary">机构交付</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {new Date(submission.created_at).toLocaleString('zh-CN')}
+                            </TableCell>
+                            <TableCell>
+                              {submission.addresses.length}
+                            </TableCell>
+                            <TableCell>
+                              {submission.status === 'pending' && (
+                                <Badge variant="secondary" className="bg-yellow-500/10 text-yellow-500">
+                                  待审核
+                                </Badge>
+                              )}
+                              {submission.status === 'approved' && (
+                                <Badge variant="secondary" className="bg-green-500/10 text-green-500">
+                                  已通过
+                                </Badge>
+                              )}
+                              {submission.status === 'rejected' && (
+                                <Badge variant="secondary" className="bg-red-500/10 text-red-500">
+                                  已拒绝
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {submission.status === 'pending' && (
+                                <div className="flex gap-2 justify-end">
+                                  <Dialog>
+                                    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                                      <DialogHeader>
+                                        <DialogTitle>地址列表 ({submission.addresses.length})</DialogTitle>
+                                        <DialogDescription>
+                                          提交者: {user?.username} | 类型: {submission.type === 'community' ? '社区' : '机构'}
+                                        </DialogDescription>
+                                      </DialogHeader>
+                                      <div className="mt-4 p-4 bg-muted rounded-md font-mono text-sm whitespace-pre-wrap break-all">
+                                        {submission.addresses.join('\n')}
+                                      </div>
+                                    </DialogContent>
+                                    <DialogTrigger asChild>
+                                      <Button size="sm" variant="outline">查看地址</Button>
+                                    </DialogTrigger>
+                                  </Dialog>
+                                  
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    onClick={() => setReviewDialog({
+                                      open: true,
+                                      type: 'interaction',
+                                      id: submission.id,
+                                      action: 'approve',
+                                    })}
+                                  >
+                                    通过
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => setReviewDialog({
+                                      open: true,
+                                      type: 'interaction',
+                                      id: submission.id,
+                                      action: 'reject',
+                                    })}
+                                  >
+                                    拒绝
+                                  </Button>
+                                </div>
+                              )}
+                              {submission.status !== 'pending' && (
+                                <Dialog>
+                                    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                                      <DialogHeader>
+                                        <DialogTitle>地址列表 ({submission.addresses.length})</DialogTitle>
+                                      </DialogHeader>
+                                      <div className="mt-4 p-4 bg-muted rounded-md font-mono text-sm whitespace-pre-wrap break-all">
+                                        {submission.addresses.join('\n')}
+                                      </div>
+                                    </DialogContent>
+                                    <DialogTrigger asChild>
+                                      <Button size="sm" variant="ghost">查看地址</Button>
+                                    </DialogTrigger>
+                                  </Dialog>
                               )}
                             </TableCell>
                           </TableRow>

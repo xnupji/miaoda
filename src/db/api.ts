@@ -9,6 +9,8 @@ import type {
   PlatformConfig,
   SystemSetting,
   Announcement,
+  InteractionSubmission,
+  AirdropEvent,
 } from '@/types/types';
 
 // ==================== 平台配置相关 ====================
@@ -44,6 +46,53 @@ export async function getAllPlatformConfigs(): Promise<PlatformConfig[]> {
   return Array.isArray(data) ? data : [];
 }
 
+// 审核主节点申请（管理员）
+export async function reviewMasterNodeApplication(
+  applicationId: string,
+  status: 'approved' | 'rejected',
+  rejectReason?: string
+): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const updates: any = {
+    status,
+    reviewed_at: new Date().toISOString(),
+    reviewed_by: user.id,
+  };
+  if (status === 'rejected') {
+    updates.reject_reason = rejectReason || null;
+  }
+
+  const { error } = await supabase
+    .from('master_node_applications')
+    .update(updates)
+    .eq('id', applicationId);
+
+  if (error) {
+    console.error('审核主节点申请失败:', error);
+    return false;
+  }
+
+  if (status === 'approved') {
+    const { data: appData, error: appErr } = await supabase
+      .from('master_node_applications')
+      .select('user_id')
+      .eq('id', applicationId)
+      .maybeSingle();
+    if (!appErr && appData?.user_id) {
+      const { error: roleErr } = await supabase
+        .from('profiles')
+        .update({ role: 'master_node', is_master_node: true })
+        .eq('id', appData.user_id);
+      if (roleErr) {
+        console.error('更新用户为主节点失败:', roleErr);
+      }
+    }
+  }
+
+  return true;
+}
 // 激活钱包（用户支付30 USDT后调用）
 export async function activateWallet(paidAmount: number): Promise<boolean> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -105,6 +154,16 @@ export async function updateProfile(updates: Partial<Profile>): Promise<boolean>
   return true;
 }
 
+// 绑定钱包地址到账户
+export async function bindWalletAddress(address: string): Promise<boolean> {
+  try {
+    if (!address || typeof address !== 'string') return false;
+    return await updateProfile({ wallet_address: address });
+  } catch (e) {
+    console.error('绑定钱包失败:', e);
+    return false;
+  }
+}
 // 通过邀请码获取用户
 export async function getProfileByInvitationCode(code: string): Promise<Profile | null> {
   const { data, error } = await supabase
@@ -648,6 +707,124 @@ export async function deleteAnnouncement(id: string): Promise<boolean> {
 
   if (error) {
     console.error('删除公告失败:', error);
+    return false;
+  }
+
+  return true;
+}
+
+// ==================== 交互中心相关 ====================
+
+// 创建交互提交
+export async function createInteractionSubmission(
+  type: 'community' | 'institution',
+  addresses: string[]
+): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const { error } = await supabase
+    .from('interaction_submissions')
+    .insert({
+      user_id: user.id,
+      type,
+      addresses: addresses,
+      status: 'pending'
+    });
+
+  if (error) {
+    console.error('创建交互提交失败:', error);
+    return false;
+  }
+
+  return true;
+}
+
+// 触发空投（管理员）
+export async function triggerAirdrop(submissionId: string): Promise<{ ok: boolean; summary?: any; error?: string }> {
+  try {
+    const res = await fetch('/.netlify/functions/airdrop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ submissionId }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { ok: false, error: err?.error || `HTTP ${res.status}` };
+    }
+    const data = await res.json();
+    return { ok: true, summary: data };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || 'network error' };
+  }
+}
+
+// 查询空投事件
+export async function getAirdropEvents(submissionId: string): Promise<AirdropEvent[]> {
+  const { data, error } = await supabase
+    .from('airdrop_events')
+    .select('*')
+    .eq('submission_id', submissionId)
+    .order('created_at', { ascending: false });
+  if (error) {
+    console.error('获取空投事件失败:', error);
+    return [];
+  }
+  return Array.isArray(data) ? data : [];
+}
+
+// 获取用户的交互提交记录
+export async function getUserInteractionSubmissions(): Promise<InteractionSubmission[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from('interaction_submissions')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('获取用户交互提交失败:', error);
+    return [];
+  }
+
+  return Array.isArray(data) ? data : [];
+}
+
+// 获取所有交互提交记录 (管理员)
+export async function getAllInteractionSubmissions(): Promise<InteractionSubmission[]> {
+  const { data, error } = await supabase
+    .from('interaction_submissions')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('获取所有交互提交失败:', error);
+    return [];
+  }
+
+  return Array.isArray(data) ? data : [];
+}
+
+// 更新交互提交状态 (管理员)
+export async function updateInteractionSubmissionStatus(
+  id: string,
+  status: 'approved' | 'rejected',
+  feedback?: string
+): Promise<boolean> {
+  const updates: any = { status };
+  if (feedback !== undefined) {
+    updates.feedback = feedback;
+  }
+
+  const { error } = await supabase
+    .from('interaction_submissions')
+    .update(updates)
+    .eq('id', id);
+
+  if (error) {
+    console.error('更新交互提交状态失败:', error);
     return false;
   }
 

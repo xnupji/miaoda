@@ -11,6 +11,7 @@ const TransactionsPage = lazy(() => import('./pages/TransactionsPage'));
 const WalletPage = lazy(() => import('./pages/WalletPage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const InteractionCenterPage = lazy(() => import('./pages/InteractionCenterPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 
 interface RouteConfig {
@@ -50,6 +51,11 @@ const routes: RouteConfig[] = [
     name: '钱包管理',
     path: '/wallet',
     element: <WalletPage />,
+  },
+  {
+    name: '交互中心',
+    path: '/interaction',
+    element: <InteractionCenterPage />,
   },
   {
     name: '管理后台',

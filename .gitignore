@@ -27,3 +27,8 @@ package-lock.json
 .sync
 history/*.json
 .vite_cache
+
+# Local Netlify folder
+.netlify
+.npm-cache
+supabase/.temp

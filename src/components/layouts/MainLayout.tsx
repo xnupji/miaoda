@@ -32,6 +32,7 @@ import {
   Sparkles,
   Shield,
   ChevronRight,
+  ArrowRightLeft,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -44,6 +45,7 @@ const navItems = [
   { path: '/mining', label: '挖矿记录', icon: Pickaxe },
   { path: '/invitation', label: '邀请好友', icon: Users },
   { path: '/master-node', label: '主节点', icon: Network },
+  { path: '/interaction', label: '交互中心', icon: ArrowRightLeft },
   { path: '/transactions', label: '交易记录', icon: History },
   { path: '/wallet', label: '钱包管理', icon: Wallet },
 ];

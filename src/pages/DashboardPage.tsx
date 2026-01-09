@@ -7,7 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Sparkles, Wallet, Users, TrendingUp, Loader2, AlertCircle } from 'lucide-react';
-import { checkTodayMining, performMining, getMiningRecords, getHTPPrice, getAnnouncements } from '@/db/api';
+import { checkTodayMining, performMining, getMiningRecords, getHTPPrice, getAnnouncements, bindWalletAddress } from '@/db/api';
 import type { MiningRecord, Announcement } from '@/types/types';
 import { cn } from '@/lib/utils';
 import InvestorsSection from '@/components/InvestorsSection';
@@ -162,6 +162,32 @@ export default function DashboardPage() {
             <p className="text-xs text-muted-foreground mt-1 truncate">
               {isConnected ? `${account?.slice(0, 10)}...` : '点击连接钱包'}
             </p>
+            {isConnected && (
+              <div className="mt-2 flex items-center gap-2">
+                {!profile?.wallet_address || (account && profile.wallet_address?.toLowerCase() !== account.toLowerCase()) ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      if (!account) return;
+                      const ok = await bindWalletAddress(account);
+                      if (ok) {
+                        toast.success('钱包地址已绑定到账户');
+                        await refreshProfile();
+                      } else {
+                        toast.error('绑定失败，请稍后重试');
+                      }
+                    }}
+                  >
+                    绑定到账户
+                  </Button>
+                ) : (
+                  <Badge variant="secondary" className="bg-green-500/10 text-green-500">
+                    已绑定账户
+                  </Badge>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -176,15 +202,15 @@ export default function DashboardPage() {
           <CardDescription>每天点击一次即可获得HTP代币奖励</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {!isConnected && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-accent/50 border border-border">
-              <AlertCircle className="w-5 h-5 text-primary" />
-              <p className="text-sm">请先连接钱包才能开始挖矿</p>
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-accent/50 border border-border">
+            <AlertCircle className="w-5 h-5 text-primary" />
+            <p className="text-sm">挖矿无需绑定钱包，直接点击开始。建议连接钱包以便后续提现与交付。</p>
+            {!isConnected && (
               <Button onClick={connectWallet} size="sm" className="ml-auto">
                 连接钱包
               </Button>
-            </div>
-          )}
+            )}
+          </div>
 
           {isConnected && !profile?.wallet_address && (
             <div className="flex items-center gap-2 p-3 rounded-lg bg-accent/50 border border-border">
@@ -206,7 +232,7 @@ export default function DashboardPage() {
             <Button
               size="lg"
               onClick={handleMining}
-              disabled={isMining || hasMined || !isConnected}
+              disabled={isMining || hasMined}
               className="px-6 py-5 text-base hover-glow"
             >
               {isMining && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
@@ -296,8 +322,4 @@ export default function DashboardPage() {
       <InvestorsSection />
     </div>
   );
-}
-
-function cn(...classes: (string | boolean | undefined)[]) {
-  return classes.filter(Boolean).join(' ');
 }

@@ -87,6 +87,28 @@ export interface MasterNodeApplication {
   reviewed_by: string | null;
 }
 
+// 交互中心提交记录
+export interface InteractionSubmission {
+  id: string;
+  user_id: string;
+  type: 'community' | 'institution';
+  addresses: string[];
+  status: ReviewStatus;
+  feedback: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AirdropEvent {
+  id: string;
+  submission_id: string;
+  address: string;
+  amount: number;
+  tx_hash: string | null;
+  status: 'pending' | 'sent' | 'failed';
+  error: string | null;
+  created_at: string;
+}
 // 提币请求
 export interface WithdrawalRequest {
   id: string;
