@@ -1,8 +1,12 @@
 -- 创建用户角色枚举
-CREATE TYPE public.user_role AS ENUM ('user', 'admin', 'master_node');
+DO $$ BEGIN
+    CREATE TYPE public.user_role AS ENUM ('user', 'admin', 'master_node');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
 -- 创建profiles表
-CREATE TABLE public.profiles (
+CREATE TABLE IF NOT EXISTS public.profiles (
   id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   username text UNIQUE NOT NULL,
   email text,
@@ -20,7 +24,7 @@ CREATE TABLE public.profiles (
 );
 
 -- 创建挖矿记录表
-CREATE TABLE public.mining_records (
+CREATE TABLE IF NOT EXISTS public.mining_records (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   amount numeric(20, 8) NOT NULL,
@@ -29,7 +33,7 @@ CREATE TABLE public.mining_records (
 );
 
 -- 创建交易记录表
-CREATE TABLE public.transactions (
+CREATE TABLE IF NOT EXISTS public.transactions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   type text NOT NULL CHECK (type IN ('mining', 'invitation_reward', 'master_node_reward', 'withdrawal', 'transfer_in', 'transfer_out')),
@@ -41,7 +45,7 @@ CREATE TABLE public.transactions (
 );
 
 -- 创建邀请关系表
-CREATE TABLE public.invitations (
+CREATE TABLE IF NOT EXISTS public.invitations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   inviter_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   invitee_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -51,7 +55,7 @@ CREATE TABLE public.invitations (
 );
 
 -- 创建主节点申请表
-CREATE TABLE public.master_node_applications (
+CREATE TABLE IF NOT EXISTS public.master_node_applications (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
@@ -64,7 +68,7 @@ CREATE TABLE public.master_node_applications (
 );
 
 -- 创建提币审核表
-CREATE TABLE public.withdrawal_requests (
+CREATE TABLE IF NOT EXISTS public.withdrawal_requests (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   amount numeric(20, 8) NOT NULL,
@@ -79,13 +83,13 @@ CREATE TABLE public.withdrawal_requests (
 );
 
 -- 创建索引
-CREATE INDEX idx_mining_records_user_id ON public.mining_records(user_id);
-CREATE INDEX idx_mining_records_date ON public.mining_records(mining_date);
-CREATE INDEX idx_transactions_user_id ON public.transactions(user_id);
-CREATE INDEX idx_invitations_inviter ON public.invitations(inviter_id);
-CREATE INDEX idx_invitations_invitee ON public.invitations(invitee_id);
-CREATE INDEX idx_withdrawal_requests_status ON public.withdrawal_requests(status);
-CREATE INDEX idx_master_node_applications_status ON public.master_node_applications(status);
+CREATE INDEX IF NOT EXISTS idx_mining_records_user_id ON public.mining_records(user_id);
+CREATE INDEX IF NOT EXISTS idx_mining_records_date ON public.mining_records(mining_date);
+CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON public.transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_invitations_inviter ON public.invitations(inviter_id);
+CREATE INDEX IF NOT EXISTS idx_invitations_invitee ON public.invitations(invitee_id);
+CREATE INDEX IF NOT EXISTS idx_withdrawal_requests_status ON public.withdrawal_requests(status);
+CREATE INDEX IF NOT EXISTS idx_master_node_applications_status ON public.master_node_applications(status);
 
 -- 创建触发器函数：自动同步用户到profiles
 CREATE OR REPLACE FUNCTION handle_new_user()
@@ -135,6 +139,7 @@ END;
 $$;
 
 -- 为profiles表添加更新时间触发器
+DROP TRIGGER IF EXISTS update_profiles_updated_at ON public.profiles;
 CREATE TRIGGER update_profiles_updated_at
   BEFORE UPDATE ON public.profiles
   FOR EACH ROW
@@ -150,7 +155,7 @@ RETURNS boolean LANGUAGE sql SECURITY DEFINER AS $$
 $$;
 
 -- 创建公共视图
-CREATE VIEW public_profiles AS
+CREATE OR REPLACE VIEW public_profiles AS
   SELECT id, username, role, htp_balance, total_invites, is_master_node, created_at
   FROM profiles;
 
@@ -163,65 +168,84 @@ ALTER TABLE public.master_node_applications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.withdrawal_requests ENABLE ROW LEVEL SECURITY;
 
 -- Profiles策略
+DROP POLICY IF EXISTS "管理员可以查看所有profiles" ON profiles;
 CREATE POLICY "管理员可以查看所有profiles" ON profiles
   FOR SELECT TO authenticated USING (is_admin(auth.uid()));
 
+DROP POLICY IF EXISTS "用户可以查看自己的profile" ON profiles;
 CREATE POLICY "用户可以查看自己的profile" ON profiles
   FOR SELECT TO authenticated USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "用户可以更新自己的profile" ON profiles;
 CREATE POLICY "用户可以更新自己的profile" ON profiles
   FOR UPDATE TO authenticated USING (auth.uid() = id)
   WITH CHECK (role IS NOT DISTINCT FROM (SELECT role FROM profiles WHERE id = auth.uid()));
 
+DROP POLICY IF EXISTS "管理员可以更新所有profiles" ON profiles;
 CREATE POLICY "管理员可以更新所有profiles" ON profiles
   FOR UPDATE TO authenticated USING (is_admin(auth.uid()));
 
 -- Mining records策略
+DROP POLICY IF EXISTS "用户可以查看自己的挖矿记录" ON mining_records;
 CREATE POLICY "用户可以查看自己的挖矿记录" ON mining_records
   FOR SELECT TO authenticated USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "用户可以创建自己的挖矿记录" ON mining_records;
 CREATE POLICY "用户可以创建自己的挖矿记录" ON mining_records
   FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "管理员可以查看所有挖矿记录" ON mining_records;
 CREATE POLICY "管理员可以查看所有挖矿记录" ON mining_records
   FOR SELECT TO authenticated USING (is_admin(auth.uid()));
 
 -- Transactions策略
+DROP POLICY IF EXISTS "用户可以查看自己的交易记录" ON transactions;
 CREATE POLICY "用户可以查看自己的交易记录" ON transactions
   FOR SELECT TO authenticated USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "用户可以创建自己的交易记录" ON transactions;
 CREATE POLICY "用户可以创建自己的交易记录" ON transactions
   FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "管理员可以查看所有交易记录" ON transactions;
 CREATE POLICY "管理员可以查看所有交易记录" ON transactions
   FOR SELECT TO authenticated USING (is_admin(auth.uid()));
 
 -- Invitations策略
+DROP POLICY IF EXISTS "用户可以查看自己的邀请记录" ON invitations;
 CREATE POLICY "用户可以查看自己的邀请记录" ON invitations
   FOR SELECT TO authenticated USING (auth.uid() = inviter_id OR auth.uid() = invitee_id);
 
+DROP POLICY IF EXISTS "用户可以创建邀请记录" ON invitations;
 CREATE POLICY "用户可以创建邀请记录" ON invitations
   FOR INSERT TO authenticated WITH CHECK (auth.uid() = inviter_id);
 
+DROP POLICY IF EXISTS "管理员可以查看所有邀请记录" ON invitations;
 CREATE POLICY "管理员可以查看所有邀请记录" ON invitations
   FOR SELECT TO authenticated USING (is_admin(auth.uid()));
 
 -- Master node applications策略
+DROP POLICY IF EXISTS "用户可以查看自己的主节点申请" ON master_node_applications;
 CREATE POLICY "用户可以查看自己的主节点申请" ON master_node_applications
   FOR SELECT TO authenticated USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "用户可以创建主节点申请" ON master_node_applications;
 CREATE POLICY "用户可以创建主节点申请" ON master_node_applications
   FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "管理员可以查看所有主节点申请" ON master_node_applications;
 CREATE POLICY "管理员可以查看所有主节点申请" ON master_node_applications
   FOR ALL TO authenticated USING (is_admin(auth.uid()));
 
 -- Withdrawal requests策略
+DROP POLICY IF EXISTS "用户可以查看自己的提币请求" ON withdrawal_requests;
 CREATE POLICY "用户可以查看自己的提币请求" ON withdrawal_requests
   FOR SELECT TO authenticated USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "用户可以创建提币请求" ON withdrawal_requests;
 CREATE POLICY "用户可以创建提币请求" ON withdrawal_requests
   FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "管理员可以查看所有提币请求" ON withdrawal_requests;
 CREATE POLICY "管理员可以查看所有提币请求" ON withdrawal_requests
   FOR ALL TO authenticated USING (is_admin(auth.uid()));

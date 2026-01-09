@@ -12,7 +12,8 @@
     "lint": "npx biome lint",
     "db:setup": "npm exec --yes -- supabase link --project-ref pwlgtiiiapiahtwtvojz",
     "db:push": "npm exec --yes -- supabase db push",
-    "deploy:db": "npm run db:setup && npm run db:push"
+    "deploy:db": "npm run db:setup && npm run db:push",
+    "deploy:all": "powershell -ExecutionPolicy Bypass -File ./deploy_all.ps1"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
