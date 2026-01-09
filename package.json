@@ -9,7 +9,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "npx biome lint"
+    "lint": "npx biome lint",
+    "db:setup": "npm exec --yes -- supabase link --project-ref pwlgtiiiapiahtwtvojz",
+    "db:push": "npm exec --yes -- supabase db push",
+    "deploy:db": "npm run db:setup && npm run db:push"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
