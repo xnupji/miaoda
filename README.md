@@ -43,5 +43,5 @@ Vite、TypeScript、React、Supabase
 
 ## HTP规划与白皮书
 
-在这里可以写出HTP的规划和白皮书。
+[📄 点击下载/阅读 HTP 白皮书 (PDF/MD)](./public/HTP_Whitepaper.md)
 
