@@ -6,6 +6,16 @@ Write-Host "      Start Full Auto Deploy      "
 Write-Host "=========================================="
 Write-Host ""
 
+# 0. Install Dependencies (Ensure Lockfile Consistency)
+Write-Host "0. Installing Dependencies (to fix CI/CD)..."
+cmd /c "npm install"
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "⚠️ Warning: npm install failed." -ForegroundColor Yellow
+} else {
+    Write-Host "✅ Dependencies installed." -ForegroundColor Green
+}
+Write-Host ""
+
 # 1. Database Deploy
 Write-Host "1. Updating Database (Supabase)..."
 

@@ -14,14 +14,21 @@ create table if not exists interaction_submissions (
 alter table interaction_submissions enable row level security;
 
 -- Policies
+
+-- Users can view their own submissions
+drop policy if exists "Users can view their own submissions" on interaction_submissions;
 create policy "Users can view their own submissions"
   on interaction_submissions for select
   using (auth.uid() = user_id);
 
+-- Users can create their own submissions
+drop policy if exists "Users can create their own submissions" on interaction_submissions;
 create policy "Users can create their own submissions"
   on interaction_submissions for insert
   with check (auth.uid() = user_id);
 
+-- Admins can view all submissions
+drop policy if exists "Admins can view all submissions" on interaction_submissions;
 create policy "Admins can view all submissions"
   on interaction_submissions for select
   using (
@@ -31,6 +38,8 @@ create policy "Admins can view all submissions"
     )
   );
 
+-- Admins can update submissions
+drop policy if exists "Admins can update submissions" on interaction_submissions;
 create policy "Admins can update submissions"
   on interaction_submissions for update
   using (
