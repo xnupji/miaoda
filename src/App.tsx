@@ -50,6 +50,7 @@ const App: React.FC = () => {
                   </Routes>
                 </Suspense>
               </LayoutWrapper>
+              <SupabaseCheck />
               <Toaster />
             </RouteGuard>
           </Web3Provider>
