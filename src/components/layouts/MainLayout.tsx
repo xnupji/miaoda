@@ -6,6 +6,7 @@ import {
   Home,
   LogOut,
   Menu,
+  MessageSquare,
   Network,
   Pickaxe,
   Settings,

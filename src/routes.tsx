@@ -12,6 +12,7 @@ const WalletPage = lazy(() => import('./pages/WalletPage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const InteractionCenterPage = lazy(() => import('./pages/InteractionCenterPage'));
+const CustomerServicePage = lazy(() => import('./pages/CustomerServicePage'));
 const SearchPage = lazy(() => import('./pages/SearchPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 
