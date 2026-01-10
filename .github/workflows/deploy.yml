@@ -27,6 +27,7 @@ jobs:
           node-version: 20
           
       - name: Install dependencies
+        # Use npm ci if package-lock.json is present, otherwise npm install
         run: npm install
 
       - name: Build
