@@ -8,7 +8,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 async function test() {
   const username = 'test_user_' + Date.now();
   const password = 'password123';
-  const email = `${username}@miaoda.com`;
+  const email = `${username}@htpfoom.top`;
 
   console.log(`Attempting to register user: ${username}`);
 

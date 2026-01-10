@@ -4,7 +4,7 @@ https://htpfoom.top
 
 ## 介绍
 
-项目介绍
+HTP (High Throughput Protocol) 是一个高性能的去中心化金融协议。
 
 ## 目录结构
 
@@ -43,5 +43,4 @@ Vite、TypeScript、React、Supabase
 
 ## HTP规划与白皮书
 
-[📄 点击下载/阅读 HTP 白皮书 (PDF/MD)](/HTP_Whitepaper.md)
-
+[📄 点击下载/阅读 HTP 白皮书 (PDF/MD)](HTP_Whitepaper.md)
