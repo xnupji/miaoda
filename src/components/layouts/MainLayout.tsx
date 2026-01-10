@@ -50,7 +50,7 @@ const navItems = [
   { path: '/transactions', label: '交易记录', icon: History },
   { path: '/wallet', label: '钱包管理', icon: Wallet },
   { path: '/search', label: '数据库搜索', icon: Sparkles },
-  { path: '/HTP_Whitepaper.md', label: '白皮书', icon: FileText, external: true },
+  { path: '/whitepaper.md', label: '白皮书', icon: FileText, external: true },
 ];
 
 export default function MainLayout({ children }: MainLayoutProps) {
