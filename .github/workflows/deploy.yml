@@ -44,16 +44,6 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
-      
-      - name: Deploy to Netlify (Optional)
-        # Only run if NETLIFY_AUTH_TOKEN is set
-        if: "${{ secrets.NETLIFY_AUTH_TOKEN != '' }}"
-        env:
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
-        run: |
-          npx --yes netlify-cli@latest deploy --prod --dir=dist --site "$NETLIFY_SITE_ID"
-        continue-on-error: true
 
   deploy:
     environment:
