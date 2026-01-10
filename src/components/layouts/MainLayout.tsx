@@ -151,6 +151,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
             <p className="text-xs text-sidebar-foreground/60">
               {profile?.role === 'admin' ? '管理员' : profile?.is_master_node ? '主节点' : '普通用户'}
             </p>
+            <p className="text-[10px] text-sidebar-foreground/40 mt-1">v1.1 (客服上线)</p>
           </div>
         </div>
       </div>
