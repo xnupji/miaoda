@@ -77,12 +77,15 @@ create policy "Anyone can view support attachments"
   using (bucket_id = 'support-attachments');
 
 -- 6. 确保实时功能开启 (Supabase Realtime)
--- 注意: 这通常需要在 Dashboard 中开启，但可以通过 SQL 尝试添加发布
-begin;
-  drop publication if exists supabase_realtime;
-  create publication supabase_realtime for table support_messages;
-exception
-  when duplicate_object then null;
-  when others then null; -- 忽略错误，通常默认已有
-end;
-alter publication supabase_realtime add table support_messages;
+-- 使用 DO 块来处理可能的错误
+do $$
+begin
+  -- 尝试将表添加到 publication (如果 publication 存在)
+  begin
+    alter publication supabase_realtime add table support_messages;
+  exception
+    when duplicate_object then null; -- 表已在 publication 中，忽略
+    when undefined_object then null; -- publication 不存在，忽略
+    when others then null; -- 其他错误，忽略
+  end;
+end $$;
