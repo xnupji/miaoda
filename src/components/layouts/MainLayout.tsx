@@ -33,6 +33,7 @@ import {
   Shield,
   ChevronRight,
   ArrowRightLeft,
+  FileText,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -48,6 +49,7 @@ const navItems = [
   { path: '/interaction', label: '交互中心', icon: ArrowRightLeft },
   { path: '/transactions', label: '交易记录', icon: History },
   { path: '/wallet', label: '钱包管理', icon: Wallet },
+  { path: '/HTP_Whitepaper.md', label: '白皮书', icon: FileText, external: true },
 ];
 
 export default function MainLayout({ children }: MainLayoutProps) {
@@ -75,6 +77,25 @@ export default function MainLayout({ children }: MainLayoutProps) {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
           
+          if (item.external) {
+            return (
+              <a
+                key={item.path}
+                href={item.path}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(
+                  'flex items-center gap-3 px-4 py-3 rounded-lg transition-all hover-glow',
+                  'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                )}
+              >
+                <Icon className="w-5 h-5" />
+                <span>{item.label}</span>
+                <ChevronRight className="w-4 h-4 ml-auto opacity-50" />
+              </a>
+            );
+          }
+
           return (
             <Link
               key={item.path}

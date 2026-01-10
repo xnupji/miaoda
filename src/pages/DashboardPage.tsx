@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Sparkles, Wallet, Users, TrendingUp, Loader2, AlertCircle } from 'lucide-react';
+import { Sparkles, Wallet, Users, TrendingUp, Loader2, AlertCircle, FileText } from 'lucide-react';
 import { checkTodayMining, performMining, getMiningRecords, getHTPPrice, getAnnouncements, bindWalletAddress } from '@/db/api';
 import type { MiningRecord, Announcement } from '@/types/types';
 import { cn } from '@/lib/utils';
@@ -80,6 +80,26 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-bold gradient-text">欢迎回来，{profile?.username}！</h1>
         <p className="text-muted-foreground mt-1">开始您的每日挖矿之旅</p>
       </div>
+
+      {/* 白皮书卡片 */}
+      <Card className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border-blue-500/20">
+        <CardContent className="flex items-center justify-between p-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-blue-500/20 rounded-full">
+              <FileText className="w-6 h-6 text-blue-500" />
+            </div>
+            <div>
+              <h3 className="font-bold text-lg">HTP 白皮书</h3>
+              <p className="text-sm text-muted-foreground">了解 HTP 项目的详细规划与未来愿景</p>
+            </div>
+          </div>
+          <Button asChild variant="outline" className="border-blue-500/50 hover:bg-blue-500/10">
+            <a href="/HTP_Whitepaper.md" target="_blank" rel="noopener noreferrer">
+              阅读白皮书
+            </a>
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* 公告栏 */}
       {showAnnouncement && announcements.length > 0 && (
