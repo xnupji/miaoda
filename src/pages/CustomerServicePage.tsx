@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/db/supabase';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,7 +34,7 @@ const CustomerServicePage: React.FC = () => {
   const { user, profile } = useAuth();
   const [messages, setMessages] = useState<Message[]>([
     {
-      id: '1',
+      id: 'welcome',
       senderId: 'system',
       senderName: '客服助手',
       content: '您好！我是您的专属客服助手。请问有什么可以帮您？',
@@ -55,35 +56,142 @@ const CustomerServicePage: React.FC = () => {
     scrollToBottom();
   }, [messages]);
 
-  const handleSendMessage = () => {
-    if (!inputValue.trim()) return;
+  // Load messages from Supabase
+  useEffect(() => {
+    if (!user) return;
 
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      senderId: user?.id || 'guest',
+    const loadMessages = async () => {
+      const { data, error } = await supabase
+        .from('support_messages')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        // If table doesn't exist yet, we silently fail and rely on local state/mock
+        // console.error('Failed to load messages:', error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const formattedMessages: Message[] = data.map(msg => ({
+          id: msg.id,
+          senderId: msg.sender_id,
+          senderName: msg.is_admin_reply ? '客服人员' : (profile?.username || '用户'),
+          content: msg.content,
+          type: msg.type as 'text' | 'image',
+          timestamp: new Date(msg.created_at),
+          isAdmin: msg.is_admin_reply
+        }));
+        
+        // Keep the welcome message if no history
+        if (formattedMessages.length > 0) {
+          setMessages(formattedMessages);
+        }
+      }
+    };
+
+    loadMessages();
+
+    // Subscribe to real-time updates
+    const channel = supabase
+      .channel(`support_chat_${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'support_messages',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const newMessage = payload.new;
+          setMessages(prev => {
+            // Avoid duplicates
+            if (prev.some(m => m.id === newMessage.id)) return prev;
+            
+            return [...prev, {
+              id: newMessage.id,
+              senderId: newMessage.sender_id,
+              senderName: newMessage.is_admin_reply ? '客服人员' : (profile?.username || '用户'),
+              content: newMessage.content,
+              type: newMessage.type,
+              timestamp: new Date(newMessage.created_at),
+              isAdmin: newMessage.is_admin_reply
+            }];
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, profile]);
+
+  const handleSendMessage = async () => {
+    if (!inputValue.trim() || !user) return;
+
+    const content = inputValue;
+    setInputValue(''); // Clear input immediately for better UX
+
+    // Optimistic update
+    const tempId = Date.now().toString();
+    const optimisticMessage: Message = {
+      id: tempId,
+      senderId: user.id,
       senderName: profile?.username || '用户',
-      content: inputValue,
+      content: content,
       type: 'text',
       timestamp: new Date(),
       isAdmin: false,
     };
+    
+    setMessages(prev => [...prev, optimisticMessage]);
 
-    setMessages(prev => [...prev, newMessage]);
-    setInputValue('');
+    // Send to Supabase
+    const { data, error } = await supabase.from('support_messages').insert({
+      user_id: user.id,
+      sender_id: user.id,
+      content: content,
+      type: 'text',
+      is_admin_reply: false,
+      is_read: false
+    }).select().single();
 
-    // Simulate auto-reply
-    setTimeout(() => {
-      const reply: Message = {
-        id: (Date.now() + 1).toString(),
-        senderId: 'system',
-        senderName: '客服助手',
-        content: '收到您的消息。我们的客服人员会尽快回复您。',
-        type: 'text',
-        timestamp: new Date(),
-        isAdmin: true,
-      };
-      setMessages(prev => [...prev, reply]);
-    }, 1000);
+    if (error) {
+      console.error('Failed to send message:', error);
+      // If failed (e.g. table missing), we keep the optimistic update but show a toast
+      // And maybe trigger the mock auto-reply for demo purposes
+      if (error.code === '42P01') { // undefined_table
+         toast.error('消息已发送 (演示模式 - 数据库未连接)');
+         setTimeout(() => {
+            const reply: Message = {
+              id: (Date.now() + 1).toString(),
+              senderId: 'system',
+              senderName: '客服助手',
+              content: '收到您的消息。我们的客服人员会尽快回复您。(演示模式)',
+              type: 'text',
+              timestamp: new Date(),
+              isAdmin: true,
+            };
+            setMessages(prev => [...prev, reply]);
+          }, 1000);
+      } else {
+         toast.error('发送失败: ' + error.message);
+      }
+    } else if (data) {
+       // Replace optimistic message with real one
+       setMessages(prev => prev.map(m => m.id === tempId ? {
+          id: data.id,
+          senderId: data.sender_id,
+          senderName: profile?.username || '用户',
+          content: data.content,
+          type: data.type,
+          timestamp: new Date(data.created_at),
+          isAdmin: data.is_admin_reply
+       } : m));
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -93,48 +201,85 @@ const CustomerServicePage: React.FC = () => {
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !user) return;
 
     setIsUploading(true);
+    const toastId = toast.loading('正在上传图片...');
 
-    // Simulate upload delay
-    setTimeout(() => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const imageUrl = event.target?.result as string;
-        
-        const newMessage: Message = {
-          id: Date.now().toString(),
-          senderId: user?.id || 'guest',
-          senderName: profile?.username || '用户',
-          content: imageUrl,
-          type: 'image',
-          timestamp: new Date(),
-          isAdmin: false,
-        };
+    try {
+      // 1. Upload to Storage
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('support-attachments')
+        .upload(fileName, file);
 
-        setMessages(prev => [...prev, newMessage]);
-        setIsUploading(false);
-        toast.success('图片发送成功');
-        
-        // Simulate auto-reply for image
-        setTimeout(() => {
-          const reply: Message = {
-            id: (Date.now() + 1).toString(),
-            senderId: 'system',
-            senderName: '客服助手',
-            content: '我们已收到您的图片反馈。',
-            type: 'text',
-            timestamp: new Date(),
-            isAdmin: true,
-          };
-          setMessages(prev => [...prev, reply]);
-        }, 1000);
-      };
-      reader.readAsDataURL(file);
-    }, 1000);
+      if (uploadError) {
+        // If bucket missing, fallback to local reader for demo
+        if (uploadError.message.includes('Bucket not found') || uploadError.message.includes('row-level security')) {
+            console.warn('Storage bucket issue, falling back to local preview');
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const imageUrl = event.target?.result as string;
+                const newMessage: Message = {
+                  id: Date.now().toString(),
+                  senderId: user.id,
+                  senderName: profile?.username || '用户',
+                  content: imageUrl,
+                  type: 'image',
+                  timestamp: new Date(),
+                  isAdmin: false,
+                };
+                setMessages(prev => [...prev, newMessage]);
+                toast.success('图片已发送 (本地演示模式)', { id: toastId });
+            };
+            reader.readAsDataURL(file);
+            setIsUploading(false);
+            return;
+        }
+        throw uploadError;
+      }
+
+      // 2. Get Public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('support-attachments')
+        .getPublicUrl(fileName);
+
+      // 3. Insert Message record
+      const { data: msgData, error: msgError } = await supabase.from('support_messages').insert({
+        user_id: user.id,
+        sender_id: user.id,
+        content: publicUrl,
+        type: 'image',
+        is_admin_reply: false,
+        is_read: false
+      }).select().single();
+
+      if (msgError) throw msgError;
+
+      if (msgData) {
+        setMessages(prev => [...prev, {
+            id: msgData.id,
+            senderId: msgData.sender_id,
+            senderName: profile?.username || '用户',
+            content: msgData.content,
+            type: msgData.type,
+            timestamp: new Date(msgData.created_at),
+            isAdmin: msgData.is_admin_reply
+        }]);
+      }
+
+      toast.success('图片发送成功', { id: toastId });
+    } catch (error: any) {
+      console.error('Upload failed:', error);
+      toast.error('上传失败: ' + error.message, { id: toastId });
+    } finally {
+      setIsUploading(false);
+      // Reset input
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   return (
