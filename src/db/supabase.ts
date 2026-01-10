@@ -64,6 +64,14 @@ const createMockClient = () => {
 };
 
 // Safe initialization: if config is missing/invalid, use mock client to prevent app crash and log spam
-export const supabase = (supabaseUrl && isKeyValid) 
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : createMockClient();
+let client;
+try {
+  client = (supabaseUrl && isKeyValid) 
+    ? createClient(supabaseUrl, supabaseAnonKey)
+    : createMockClient();
+} catch (error) {
+  console.error('Failed to initialize Supabase client:', error);
+  client = createMockClient();
+}
+
+export const supabase = client;
