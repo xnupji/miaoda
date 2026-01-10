@@ -59,6 +59,11 @@ const routes: RouteConfig[] = [
     element: <InteractionCenterPage />,
   },
   {
+    name: '客服中心',
+    path: '/customer-service',
+    element: <CustomerServicePage />,
+  },
+  {
     name: '管理后台',
     path: '/admin',
     element: <AdminPage />,

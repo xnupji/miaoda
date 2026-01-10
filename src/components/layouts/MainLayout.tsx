@@ -47,6 +47,7 @@ const navItems = [
   { path: '/invitation', label: '邀请好友', icon: Users },
   { path: '/master-node', label: '主节点', icon: Network },
   { path: '/interaction', label: '交互中心', icon: ArrowRightLeft },
+  { path: '/customer-service', label: '客服中心', icon: MessageSquare },
   { path: '/transactions', label: '交易记录', icon: History },
   { path: '/wallet', label: '钱包管理', icon: Wallet },
   { path: '/search', label: '数据库搜索', icon: Sparkles },
