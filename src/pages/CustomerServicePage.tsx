@@ -1,24 +1,24 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/db/supabase';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { 
+  Bot, 
+  Headphones, 
+  Image as ImageIcon, 
+  MoreVertical,
+  Paperclip,
+  Send, 
+  Smile,
+  User 
+} from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { toast } from 'sonner';
-import { 
-  Send, 
-  Image as ImageIcon, 
-  User, 
-  Headphones, 
-  Paperclip,
-  Smile,
-  MoreVertical,
-  Bot
-} from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/db/supabase';
 
 interface Message {
   id: string;

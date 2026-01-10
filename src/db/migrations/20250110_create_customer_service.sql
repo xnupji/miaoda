@@ -13,19 +13,22 @@ create table if not exists support_messages (
 -- Enable RLS
 alter table support_messages enable row level security;
 
--- Policies
+-- Policies (Drop first to avoid conflicts)
 
 -- Users can view messages where they are the user_id (their own conversation)
+drop policy if exists "Users can view their own support messages" on support_messages;
 create policy "Users can view their own support messages"
   on support_messages for select
   using (auth.uid() = user_id);
 
 -- Users can insert messages to their own conversation
+drop policy if exists "Users can insert their own support messages" on support_messages;
 create policy "Users can insert their own support messages"
   on support_messages for insert
   with check (auth.uid() = user_id);
 
 -- Admins can view all support messages
+drop policy if exists "Admins can view all support messages" on support_messages;
 create policy "Admins can view all support messages"
   on support_messages for select
   using (
@@ -36,6 +39,7 @@ create policy "Admins can view all support messages"
   );
 
 -- Admins can insert messages (replies)
+drop policy if exists "Admins can insert support messages" on support_messages;
 create policy "Admins can insert support messages"
   on support_messages for insert
   with check (
@@ -51,6 +55,7 @@ values ('support-attachments', 'support-attachments', true)
 on conflict (id) do nothing;
 
 -- Storage policies
+drop policy if exists "Users can upload support attachments" on storage.objects;
 create policy "Users can upload support attachments"
   on storage.objects for insert
   with check (
@@ -58,6 +63,7 @@ create policy "Users can upload support attachments"
     auth.uid() = owner
   );
 
+drop policy if exists "Anyone can view support attachments" on storage.objects;
 create policy "Anyone can view support attachments"
   on storage.objects for select
   using (bucket_id = 'support-attachments');

@@ -1,6 +1,6 @@
+import { RefreshCcw } from 'lucide-react';
 import { Component, ErrorInfo, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
-import { RefreshCcw } from 'lucide-react';
 
 interface Props {
   children: ReactNode;

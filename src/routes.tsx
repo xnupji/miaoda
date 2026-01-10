@@ -1,5 +1,5 @@
-import { lazy } from 'react';
 import type { ReactNode } from 'react';
+import { lazy } from 'react';
 import { Navigate } from 'react-router-dom';
 
 // 懒加载页面组件

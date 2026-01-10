@@ -1,16 +1,23 @@
+import {
+  ArrowRightLeft,
+  ChevronRight,
+  FileText,
+  History,
+  Home,
+  LogOut,
+  Menu,
+  Network,
+  Pickaxe,
+  Settings,
+  Shield,
+  Sparkles,
+  Users,
+  Wallet,
+} from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { useWeb3 } from '@/contexts/Web3Context';
-import { Button } from '@/components/ui/button';
-import { Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,22 +26,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Home,
-  Pickaxe,
-  Users,
-  Network,
-  History,
-  Wallet,
-  Settings,
-  LogOut,
-  Menu,
-  Sparkles,
-  Shield,
-  ChevronRight,
-  ArrowRightLeft,
-  FileText,
-} from 'lucide-react';
+import { Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
+import { useAuth } from '@/contexts/AuthContext';
+import { useWeb3 } from '@/contexts/Web3Context';
 import { cn } from '@/lib/utils';
 
 interface MainLayoutProps {

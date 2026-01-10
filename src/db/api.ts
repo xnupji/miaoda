@@ -1,17 +1,17 @@
-import { supabase } from './supabase';
 import type {
-  Profile,
-  MiningRecord,
-  Transaction,
-  Invitation,
-  MasterNodeApplication,
-  WithdrawalRequest,
-  PlatformConfig,
-  SystemSetting,
+  AirdropEvent,
   Announcement,
   InteractionSubmission,
-  AirdropEvent,
+  Invitation,
+  MasterNodeApplication,
+  MiningRecord,
+  PlatformConfig,
+  Profile,
+  SystemSetting,
+  Transaction,
+  WithdrawalRequest,
 } from '@/types/types';
+import { supabase } from './supabase';
 
 // ==================== 平台配置相关 ====================
 

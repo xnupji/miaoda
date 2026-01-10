@@ -1,10 +1,10 @@
+import { Database, Loader2, Search as SearchIcon } from 'lucide-react';
 import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { supabase } from '@/db/supabase';
-import { Search as SearchIcon, Loader2, Database } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/db/supabase';
 
 interface SearchResult {
   id: string;

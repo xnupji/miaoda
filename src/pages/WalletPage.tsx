@@ -1,19 +1,18 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useWeb3 } from '@/contexts/Web3Context';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { AlertCircle, CheckCircle2, Copy, Link as LinkIcon, Loader2, Send, Wallet } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { toast } from 'sonner';
-import { Wallet, Link as LinkIcon, AlertCircle, Loader2, Send, Copy, CheckCircle2 } from 'lucide-react';
-import { updateProfile, getPlatformConfig, activateWallet } from '@/db/api';
-import { createWithdrawalRequest, getMyWithdrawalRequests } from '@/db/api';
-import type { WithdrawalRequest } from '@/types/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/contexts/AuthContext';
+import { useWeb3 } from '@/contexts/Web3Context';
+import { activateWallet, createWithdrawalRequest, getMyWithdrawalRequests, getPlatformConfig, updateProfile } from '@/db/api';
+import type { WithdrawalRequest } from '@/types/types';
 
 export default function WalletPage() {
   const { profile, refreshProfile } = useAuth();

@@ -1,12 +1,12 @@
 import React, { Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Navigate, Route, BrowserRouter as Router, Routes, useLocation } from 'react-router-dom';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import IntersectObserver from '@/components/common/IntersectObserver';
+import { RouteGuard } from '@/components/common/RouteGuard';
+import MainLayout from '@/components/layouts/MainLayout';
+import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { Web3Provider } from '@/contexts/Web3Context';
-import { RouteGuard } from '@/components/common/RouteGuard';
-import { ErrorBoundary } from '@/components/common/ErrorBoundary';
-import { Toaster } from '@/components/ui/sonner';
-import MainLayout from '@/components/layouts/MainLayout';
 import routes from './routes';
 
 // 加载中组件

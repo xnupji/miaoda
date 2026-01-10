@@ -1,16 +1,16 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Copy, Gift, Loader2, Users } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
-import { Copy, Users, Gift, Loader2 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import { getMyInvitations } from '@/db/api';
-import type { Invitation } from '@/types/types';
 import { supabase } from '@/db/supabase';
+import type { Invitation } from '@/types/types';
 
 export default function InvitationPage() {
   const { profile, refreshProfile } = useAuth();

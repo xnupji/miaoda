@@ -1,5 +1,5 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { BrowserProvider } from 'ethers';
+import { createContext, type ReactNode, useContext, useEffect, useState } from 'react';
 
 interface Web3ContextType {
   account: string | null;

@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { Loader2, Sparkles } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Loader2, Sparkles } from 'lucide-react';
 import { getMiningRecords } from '@/db/api';
 import type { MiningRecord } from '@/types/types';
 

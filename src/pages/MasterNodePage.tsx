@@ -1,15 +1,15 @@
-import { useState, useEffect } from 'react';
+import { Award, CheckCircle, Clock, Loader2, Network, Wallet, XCircle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWeb3 } from '@/contexts/Web3Context';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { toast } from 'sonner';
-import { Network, CheckCircle, Clock, XCircle, Loader2, Award, Wallet } from 'lucide-react';
-import { getMasterNodeApplication, applyMasterNode, updateProfile } from '@/db/api';
+import { applyMasterNode, getMasterNodeApplication, updateProfile } from '@/db/api';
 import type { MasterNodeApplication } from '@/types/types';
 
 export default function MasterNodePage() {

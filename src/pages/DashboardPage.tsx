@@ -1,17 +1,16 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useWeb3 } from '@/contexts/Web3Context';
+import { AlertCircle, FileText, Loader2, Megaphone, Sparkles, TrendingUp, Users, Wallet, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import InvestorsSection from '@/components/InvestorsSection';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
-import { Sparkles, Wallet, Users, TrendingUp, Loader2, AlertCircle, FileText } from 'lucide-react';
-import { checkTodayMining, performMining, getMiningRecords, getHTPPrice, getAnnouncements, bindWalletAddress } from '@/db/api';
-import type { MiningRecord, Announcement } from '@/types/types';
+import { useAuth } from '@/contexts/AuthContext';
+import { useWeb3 } from '@/contexts/Web3Context';
+import { bindWalletAddress, checkTodayMining, getAnnouncements, getHTPPrice, getMiningRecords, performMining } from '@/db/api';
 import { cn } from '@/lib/utils';
-import InvestorsSection from '@/components/InvestorsSection';
-import { Megaphone, X } from 'lucide-react';
+import type { Announcement, MiningRecord } from '@/types/types';
 
 export default function DashboardPage() {
   const { profile, refreshProfile } = useAuth();
