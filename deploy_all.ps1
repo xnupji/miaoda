@@ -2,49 +2,57 @@
 $OutputEncoding = [Console]::InputEncoding = [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding
 
 Write-Host "=========================================="
-Write-Host "      Start Full Auto Deploy      "
+Write-Host "      Start Full Auto Deploy (Robust)     "
 Write-Host "=========================================="
 Write-Host ""
 
 # 0. Install Dependencies (Ensure Lockfile Consistency)
-Write-Host "0. Installing Dependencies (to fix CI/CD)..."
+Write-Host "0. Installing Dependencies..."
 cmd /c "npm install"
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "⚠️ Warning: npm install failed." -ForegroundColor Yellow
+    Write-Host "⚠️ Warning: npm install failed. This might cause build issues." -ForegroundColor Yellow
 } else {
     Write-Host "✅ Dependencies installed." -ForegroundColor Green
 }
 Write-Host ""
 
-# 1. Database Deploy
+# 1. Database Deploy (With Fallback)
 Write-Host "1. Updating Database (Supabase)..."
 
-# Check if logged in by trying to link
-Write-Host "   > Linking project..."
-# cmd /c "npm run db:setup"
-Write-Host "   Skipping link step to avoid interactive prompt freeze. Ensure you are logged in."
-
-Write-Host "   > Pushing database changes..."
+# Try to push
+Write-Host "   > Attempting 'npm run db:push'..."
 cmd /c "npm run db:push"
+
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "⚠️ Warning: Database push failed. Please check the logs." -ForegroundColor Yellow
-    Write-Host "Continuing with code deployment..." -ForegroundColor Yellow
-    # exit $LASTEXITCODE
+    Write-Host ""
+    Write-Host "⚠️  DATABASE UPDATE FAILED" -ForegroundColor Red
+    Write-Host "   Possible reasons:"
+    Write-Host "   - Supabase CLI not installed (run 'npm install -D supabase')"
+    Write-Host "   - Not logged in (run 'npx supabase login')"
+    Write-Host "   - Project not linked (run 'npx supabase link --project-ref pwlgtiiiapiahtwtvojz')"
+    Write-Host ""
+    Write-Host "   👉 ACTION REQUIRED: Open 'manual_db_fix.sql' and run it in Supabase SQL Editor!" -ForegroundColor Yellow
+    Write-Host "   Continuing with website deployment..."
+    Start-Sleep -Seconds 3
+} else {
+    Write-Host "✅ Database update successful!" -ForegroundColor Green
 }
-Write-Host "✅ Database update successful!" -ForegroundColor Green
 Write-Host ""
 
-# 2. Git Deploy
-Write-Host "2. Uploading Code to GitHub..."
+# 2. Git Deploy (Force Push)
+Write-Host "2. Uploading Code to GitHub (Triggers Auto-Deploy)..."
+
+# Ensure we are on the right branch/remote
+git remote -v
+
 git add .
-$commitMsg = "Auto Update"
-# $commitMsg = Read-Host "Enter commit message (Press Enter for 'Auto Update')"
-if ($commitMsg -eq "") { $commitMsg = "Auto Update" }
+$commitMsg = "Auto Update: " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
 
 try {
     git commit -m "$commitMsg"
+    Write-Host "✅ Changes committed." -ForegroundColor Green
 } catch {
-    Write-Host "No changes to commit."
+    Write-Host "ℹ️ No new changes to commit." -ForegroundColor Gray
 }
 
 Write-Host "Pushing to server..."
@@ -53,10 +61,12 @@ git push
 if ($LASTEXITCODE -eq 0) {
     Write-Host ""
     Write-Host "=========================================="
-    Write-Host "🎉  All Completed Successfully!      "
-    Write-Host "1. Database updated."
-    Write-Host "2. Code uploaded."
+    Write-Host "🎉  DEPLOYMENT TRIGGERED SUCCESSFULLY!    "
+    Write-Host "=========================================="
+    Write-Host "1. Code pushed to GitHub."
+    Write-Host "2. GitHub Actions will build and deploy the website (~2-3 mins)."
+    Write-Host "3. If 'Customer Service' is missing, check the Database step above."
     Write-Host "=========================================="
 } else {
-    Write-Host "❌ Error: Git push failed." -ForegroundColor Red
+    Write-Host "❌ Error: Git push failed. Check your internet or git credentials." -ForegroundColor Red
 }
