@@ -11,17 +11,8 @@ Write-Host "1. Updating Database (Supabase)..."
 
 # Check if logged in by trying to link
 Write-Host "   > Linking project..."
-cmd /c "npm run db:setup"
-if ($LASTEXITCODE -ne 0) {
-    Write-Host ""
-    Write-Host "-----------------------------------------------------" -ForegroundColor Red
-    Write-Host "ERROR: Supabase Login Required" -ForegroundColor Red
-    Write-Host "It seems you are not logged in to Supabase." -ForegroundColor Yellow
-    Write-Host "Please run the following command manually:" -ForegroundColor Yellow
-    Write-Host "    npx supabase login" -ForegroundColor Cyan
-    Write-Host "-----------------------------------------------------" -ForegroundColor Red
-    exit $LASTEXITCODE
-}
+# cmd /c "npm run db:setup"
+Write-Host "   Skipping link step to avoid interactive prompt freeze. Ensure you are logged in."
 
 Write-Host "   > Pushing database changes..."
 cmd /c "npm run db:push"
