@@ -26,31 +26,15 @@ jobs:
         with:
           node-version: 20
           
-      - name: Check Secrets
-        run: |
-          if [ -z "${{ secrets.VITE_SUPABASE_URL }}" ]; then
-            echo "::warning::VITE_SUPABASE_URL secret is missing!"
-          else
-            echo "VITE_SUPABASE_URL is set."
-          fi
-          if [ -z "${{ secrets.VITE_SUPABASE_ANON_KEY }}" ]; then
-            echo "::warning::VITE_SUPABASE_ANON_KEY secret is missing!"
-          else
-            echo "VITE_SUPABASE_ANON_KEY is set."
-          fi
-
       - name: Install dependencies
-        # Remove package-lock.json to avoid platform-specific issues (Windows vs Linux)
-        # Then install fresh dependencies
-        run: |
-          rm -f package-lock.json
-          npm install
+        # Use npm install to ensure compatibility with package-lock.json or generate new one
+        run: npm install
 
       - name: Build
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          CI: false # Prevent treating warnings as errors
+          CI: false
         run: |
           npm run build
           ls -R dist
