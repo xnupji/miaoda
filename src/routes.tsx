@@ -12,6 +12,7 @@ const WalletPage = lazy(() => import('./pages/WalletPage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 const InteractionCenterPage = lazy(() => import('./pages/InteractionCenterPage'));
+const SearchPage = lazy(() => import('./pages/SearchPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 
 interface RouteConfig {
@@ -66,6 +67,12 @@ const routes: RouteConfig[] = [
     name: '设置',
     path: '/settings',
     element: <SettingsPage />,
+  },
+  {
+    name: '搜索',
+    path: '/search',
+    element: <SearchPage />,
+    visible: false, // Hidden from auto-generated menus if needed, but we'll add it manually to MainLayout
   },
   {
     name: '登录',

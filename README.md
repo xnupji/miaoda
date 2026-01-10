@@ -1,4 +1,4 @@
-# 欢迎使用你的秒哒应用代码包
+# 欢迎使用你的 HTP 应用代码包
 
 https://htpfoom.top
 
@@ -43,5 +43,5 @@ Vite、TypeScript、React、Supabase
 
 ## HTP规划与白皮书
 
-[📄 点击下载/阅读 HTP 白皮书 (PDF/MD)](./public/HTP_Whitepaper.md)
+[📄 点击下载/阅读 HTP 白皮书 (PDF/MD)](/HTP_Whitepaper.md)
 

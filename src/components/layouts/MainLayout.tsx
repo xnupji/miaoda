@@ -49,6 +49,7 @@ const navItems = [
   { path: '/interaction', label: '交互中心', icon: ArrowRightLeft },
   { path: '/transactions', label: '交易记录', icon: History },
   { path: '/wallet', label: '钱包管理', icon: Wallet },
+  { path: '/search', label: '数据库搜索', icon: Sparkles },
   { path: '/HTP_Whitepaper.md', label: '白皮书', icon: FileText, external: true },
 ];
 
