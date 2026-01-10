@@ -8,7 +8,7 @@ Write-Host ""
 
 # 0. Install Dependencies (Ensure Lockfile Consistency)
 Write-Host "0. Installing Dependencies..."
-cmd /c "npm install"
+npm.cmd install
 if ($LASTEXITCODE -ne 0) {
     Write-Host "⚠️ Warning: npm install failed. This might cause build issues." -ForegroundColor Yellow
 } else {
@@ -21,7 +21,7 @@ Write-Host "1. Updating Database (Supabase)..."
 
 # Try to push
 Write-Host "   > Attempting 'npm run db:push'..."
-cmd /c "npm run db:push"
+npm.cmd run db:push
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host ""

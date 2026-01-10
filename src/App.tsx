@@ -11,8 +11,10 @@ import routes from './routes';
 
 // 加载中组件
 const LoadingFallback = () => (
-  <div className="flex items-center justify-center min-h-screen">
+  <div className="flex flex-col items-center justify-center min-h-screen gap-4">
     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+    <p className="text-muted-foreground text-sm">Loading System Resources...</p>
+    <p className="text-xs text-muted-foreground/50">v2026.01.10.1</p>
   </div>
 );
 

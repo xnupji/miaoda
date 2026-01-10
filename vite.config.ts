@@ -15,13 +15,6 @@ export default defineConfig({
         namedExport: "ReactComponent",
       },
     }),
-    {
-      name: 'no-crossorigin',
-      enforce: 'post',
-      transformIndexHtml(html) {
-        return html.replace(/crossorigin/g, '');
-      }
-    },
   ],
   resolve: {
     alias: {

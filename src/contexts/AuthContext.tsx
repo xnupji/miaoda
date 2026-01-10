@@ -47,17 +47,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (error) {
+        console.error('Session check failed:', error);
+        setLoading(false);
+        return;
+      }
+      
+      const session = data?.session;
       setUser(session?.user ?? null);
       if (session?.user) {
         getProfile(session.user.id).then((profile) => {
           setProfile(profile);
           setLoading(false);
+        }).catch(err => {
+          console.error('Profile fetch failed:', err);
+          setLoading(false);
         });
       } else {
         setLoading(false);
       }
+    }).catch(err => {
+      console.error('Auth initialization error:', err);
+      setLoading(false);
     });
+
     // In this function, do NOT use any await calls. Use `.then()` instead to avoid deadlocks.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       setUser(session?.user ?? null);
