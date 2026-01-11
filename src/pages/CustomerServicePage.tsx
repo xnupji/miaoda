@@ -128,7 +128,6 @@ const CustomerServicePage: React.FC = () => {
           table: 'support_messages',
         },
         async (payload) => {
-          console.log('Realtime update received:', payload);
           fetchConversations(); // Simply re-fetch to be safe and consistent
         }
       )

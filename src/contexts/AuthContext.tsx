@@ -112,7 +112,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (username: string, password: string) => {
     try {
       const email = `${username.trim().toLowerCase()}@miaoda.com`;
-      // console.log('Attempting login with:', { username, email });
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -132,7 +131,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const normalizedUsername = username.trim().toLowerCase();
       const email = `${normalizedUsername}@miaoda.com`;
-      // console.log('Attempting registration with:', { username: normalizedUsername, email });
       
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -150,8 +148,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
          throw error;
       }
       
-      // console.log('Registration success:', data);
-
       // 邀请奖励逻辑已移至数据库触发器 handle_new_user 处理，
       // 确保原子性和可靠性，避免前端网络问题导致奖励丢失或重复。
       
