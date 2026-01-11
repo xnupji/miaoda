@@ -7,12 +7,13 @@ const SupabaseCheck: React.FC = () => {
   useEffect(() => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    const isKeyValid = supabaseKey && supabaseKey.startsWith('eyJ');
+    // Modified: 暂时放宽校验
+    const isKeyValid = supabaseKey && supabaseKey.length > 20;
 
     if (!supabaseUrl || !isKeyValid) {
       setIsVisible(true);
       toast.error('Supabase configuration missing or invalid!', {
-        description: 'VITE_SUPABASE_ANON_KEY should start with "eyJ". Please check your .env file.',
+        description: 'Please check your .env file or credentials.',
         duration: Infinity, // Keep it visible until fixed
       });
     }
