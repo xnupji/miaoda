@@ -69,8 +69,8 @@ const CustomerServicePage: React.FC = () => {
     if (!isAdmin) return;
 
     const fetchConversations = async () => {
+      console.log('Fetching conversations for admin...');
       // Fetch all messages to construct conversation list
-      // Note: In a production app with millions of messages, you'd want a dedicated 'conversations' table.
       const { data, error } = await supabase
         .from('support_messages')
         .select(`
@@ -85,6 +85,8 @@ const CustomerServicePage: React.FC = () => {
         console.error('Error fetching conversations:', error);
         return;
       }
+      
+      console.log('Raw messages fetched:', data?.length);
 
       const convMap = new Map<string, Conversation>();
       
@@ -95,22 +97,25 @@ const CustomerServicePage: React.FC = () => {
             username: msg.profiles?.username || '未知用户',
             lastMessage: msg.type === 'image' ? '[图片]' : msg.content,
             lastTimestamp: new Date(msg.created_at),
-            unreadCount: 0 // We can implement read status logic later
+            unreadCount: 0 
           });
         }
-        // Count unread messages (from user, not admin reply, and not read)
-        // Currently 'is_read' might not be fully implemented, so we skip exact count for now
+        
+        // Count unread: if message is NOT from admin (is_admin_reply = false) AND not read
+        const isFromUser = !msg.is_admin_reply;
+        if (isFromUser && !msg.is_read) {
+           const conv = convMap.get(msg.user_id);
+           if (conv) conv.unreadCount += 1;
+        }
       });
 
       setConversations(Array.from(convMap.values()));
-      
-      // Select first conversation if none selected
-      if (!selectedUserId && convMap.size > 0) {
-        // Optional: Auto-select first? Maybe not.
-      }
     };
 
     fetchConversations();
+    
+    // Polling interval for robustness (every 5 seconds)
+    const intervalId = setInterval(fetchConversations, 5000);
 
     // Subscribe to all new messages for admin
     const channel = supabase
@@ -118,34 +123,19 @@ const CustomerServicePage: React.FC = () => {
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*', // Listen to ALL events (INSERT, UPDATE)
           schema: 'public',
           table: 'support_messages',
         },
         async (payload) => {
-          const newMsg = payload.new;
-          // Refresh conversations or update manually
-          // Simple approach: Re-fetch or patch
-          // Let's patch for efficiency
-          const { data: userData } = await supabase.from('profiles').select('username').eq('id', newMsg.user_id).single();
-          
-          setConversations(prev => {
-            const existing = prev.find(c => c.userId === newMsg.user_id);
-            const updated: Conversation = {
-              userId: newMsg.user_id,
-              username: userData?.username || existing?.username || '未知用户',
-              lastMessage: newMsg.type === 'image' ? '[图片]' : newMsg.content,
-              lastTimestamp: new Date(newMsg.created_at),
-              unreadCount: existing ? existing.unreadCount + (newMsg.is_admin_reply ? 0 : 1) : 1
-            };
-            
-            return [updated, ...prev.filter(c => c.userId !== newMsg.user_id)];
-          });
+          console.log('Realtime update received:', payload);
+          fetchConversations(); // Simply re-fetch to be safe and consistent
         }
       )
       .subscribe();
 
     return () => {
+      clearInterval(intervalId);
       supabase.removeChannel(channel);
     };
   }, [isAdmin]);
