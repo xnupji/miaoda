@@ -50,7 +50,8 @@ const CustomerServicePage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Admin State
-  const isAdmin = profile?.role === 'admin';
+  // Fallback: Check username 'admin' in case role update hasn't propagated or failed
+  const isAdmin = profile?.role === 'admin' || profile?.username === 'admin';
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
