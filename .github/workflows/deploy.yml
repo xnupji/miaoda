@@ -37,6 +37,7 @@ jobs:
           CI: false
         run: |
           npm run build
+          cp public/CNAME dist/CNAME || true
           ls -R dist
           cp dist/index.html dist/404.html
 

@@ -1,6 +1,7 @@
 {
   "name": "htp-react-admin",
   "version": "0.0.1",
+  "homepage": "https://htpfoom.top",
   "type": "module",
   "resolutions": {
     "@types/react": "18.3.1",
