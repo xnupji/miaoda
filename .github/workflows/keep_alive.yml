@@ -1,0 +1,33 @@
+name: Supabase Keep Alive
+
+on:
+  schedule:
+    # 每天 UTC 时间 00:00 运行 (北京时间 08:00)
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase Database
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          echo "Pinging Supabase to prevent inactivity pause..."
+          # 请求 profiles 表的一行数据，仅作为唤醒操作
+          # 如果数据库已暂停，这个请求可能会失败，但通常对于 active 的数据库可以防止其进入暂停状态
+          response=$(curl -s -o /dev/null -w "%{http_code}" -X GET "$SUPABASE_URL/rest/v1/profiles?select=id&limit=1" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY")
+          
+          echo "Response status code: $response"
+          
+          if [ "$response" -ge 200 ] && [ "$response" -lt 300 ]; then
+            echo "Success: Database is active."
+          else
+            echo "Warning: Database might be paused or unreachable (Status: $response)."
+            # 不让 workflow 失败，只是记录警告
+            exit 0
+          fi
