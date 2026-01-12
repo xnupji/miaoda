@@ -72,6 +72,32 @@ export default function AdminPage() {
     loadDeveloperAddress();
     loadHtpPriceSettings();
   }, []);
+  
+  useEffect(() => {
+    const channel = supabase
+      .channel('admin_profiles_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'profiles',
+        },
+        async () => {
+          await loadData();
+        }
+      )
+      .subscribe();
+    
+    const intervalId = setInterval(() => {
+      loadData();
+    }, 10000);
+    
+    return () => {
+      clearInterval(intervalId);
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const loadDeveloperAddress = async () => {
     const address = await getPlatformConfig('developer_usdt_address');
