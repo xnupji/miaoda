@@ -1,5 +1,5 @@
 import { ArrowRightLeft, FileCheck, Loader2, Megaphone, Network, Pencil, Plus, Settings, Shield, Trash2, TrendingUp, Users, Wallet } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -98,6 +98,12 @@ export default function AdminPage() {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  const userMap = useMemo(() => {
+    const m = new Map<string, Profile>();
+    for (const u of users) m.set(u.id, u);
+    return m;
+  }, [users]);
 
   const loadDeveloperAddress = async () => {
     const address = await getPlatformConfig('developer_usdt_address');
@@ -608,7 +614,7 @@ export default function AdminPage() {
                           <TableCell className="font-medium">{user.username}</TableCell>
                           <TableCell>{user.htp_balance.toFixed(2)}</TableCell>
                           <TableCell>{user.usdt_balance.toFixed(2)}</TableCell>
-                          <TableCell>{user.invited_by ? (users.find(u => u.id === user.invited_by)?.username || '-') : '-'}</TableCell>
+                          <TableCell>{user.invited_by ? (userMap.get(user.invited_by)?.username || '-') : '-'}</TableCell>
                           <TableCell>{user.total_invites}</TableCell>
                           <TableCell>{user.team_size ?? 0}</TableCell>
                           <TableCell>

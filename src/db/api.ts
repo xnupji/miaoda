@@ -540,17 +540,39 @@ export async function reviewWithdrawalRequest(
 
 // 获取所有用户（管理员）
 export async function getAllProfiles(): Promise<Profile[]> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .order('created_at', { ascending: false });
+  const pageSize = 1000;
+  let from = 0;
+  let all: Profile[] = [];
+  // 分页拉取所有用户，避免默认上限导致数据不全
+  // 循环直到返回的数据条数小于分页大小
+  // range 使用的是闭区间 [from, to]
+  while (true) {
+    const to = from + pageSize - 1;
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .range(from, to);
 
-  if (error) {
-    console.error('获取所有用户失败:', error);
-    return [];
+    if (error) {
+      console.error('获取所有用户失败:', error);
+      break;
+    }
+
+    if (!data || data.length === 0) {
+      break;
+    }
+
+    all = all.concat(data as Profile[]);
+
+    if (data.length < pageSize) {
+      break;
+    }
+
+    from += pageSize;
   }
 
-  return Array.isArray(data) ? data : [];
+  return all;
 }
 
 // 更新用户角色（管理员）
