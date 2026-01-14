@@ -21,7 +21,7 @@ Write-Host "1. Updating Database (Supabase)..."
 
 # Try to push
 Write-Host "   > Attempting 'npm run db:push'..."
-npm.cmd run db:push
+cmd /c "echo y | npm run db:push"
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host ""

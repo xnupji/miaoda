@@ -69,6 +69,7 @@ export default function InvitationPage() {
 
   const totalRewards = invitations.reduce((sum, inv) => sum + inv.reward_amount, 0);
   const inviteCount = invitations.length;
+  const teamSize = profile?.team_size ?? 0;
 
   return (
     <div className="space-y-6">
@@ -83,7 +84,7 @@ export default function InvitationPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Users className="w-4 h-4" />
-              邀请人数
+              直接邀请人数
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -109,6 +110,18 @@ export default function InvitationPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">10 HTP</div>
+          </CardContent>
+        </Card>
+
+        <Card className="glow-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              团队总人数
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{teamSize}</div>
           </CardContent>
         </Card>
       </div>

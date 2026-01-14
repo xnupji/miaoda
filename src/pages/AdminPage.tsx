@@ -594,7 +594,8 @@ export default function AdminPage() {
                         <TableHead>HTP余额</TableHead>
                         <TableHead>USDT余额</TableHead>
                         <TableHead>邀请人</TableHead>
-                        <TableHead>邀请人数</TableHead>
+                        <TableHead>直接邀请人数</TableHead>
+                        <TableHead>团队总人数</TableHead>
                         <TableHead>钱包状态</TableHead>
                         <TableHead>注册时间</TableHead>
                         <TableHead>角色</TableHead>
@@ -609,6 +610,7 @@ export default function AdminPage() {
                           <TableCell>{user.usdt_balance.toFixed(2)}</TableCell>
                           <TableCell>{user.invited_by ? (users.find(u => u.id === user.invited_by)?.username || '-') : '-'}</TableCell>
                           <TableCell>{user.total_invites}</TableCell>
+                          <TableCell>{user.team_size ?? 0}</TableCell>
                           <TableCell>
                             {user.wallet_activated ? (
                               <Badge variant="secondary" className="bg-green-500/10 text-green-500">

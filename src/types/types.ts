@@ -28,6 +28,7 @@ export interface Profile {
   invited_by: string | null;
   invitation_code: string;
   total_invites: number;
+  team_size: number;
   is_master_node: boolean;
   master_node_progress: number;
   created_at: string;
