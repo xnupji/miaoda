@@ -1,0 +1,77 @@
+-- 请复制以下所有代码，在 Supabase 后台的 SQL Editor 中运行
+-- (Copy all code below and run in Supabase SQL Editor)
+
+create table if not exists public.task_orders (
+  id uuid default gen_random_uuid() primary key,
+  title text not null,
+  description text,
+  reward numeric not null default 0,
+  max_claims int,
+  status text not null check (status in ('open', 'closed')) default 'open',
+  created_by uuid references public.profiles(id) not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table public.task_orders enable row level security;
+
+drop policy if exists "Anyone can view open task orders" on public.task_orders;
+create policy "Anyone can view open task orders"
+  on public.task_orders for select
+  using (status = 'open');
+
+drop policy if exists "Admins can manage all task orders" on public.task_orders;
+create policy "Admins can manage all task orders"
+  on public.task_orders for all
+  using (
+    exists (
+      select 1 from public.profiles
+      where profiles.id = auth.uid() and profiles.role = 'admin'
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.profiles
+      where profiles.id = auth.uid() and profiles.role = 'admin'
+    )
+  );
+
+create table if not exists public.task_order_claims (
+  id uuid default gen_random_uuid() primary key,
+  task_id uuid references public.task_orders(id) on delete cascade not null,
+  user_id uuid references public.profiles(id) not null,
+  status text not null check (status in ('claimed', 'submitted', 'approved', 'rejected')) default 'claimed',
+  proof_url text,
+  proof_notes text,
+  receive_username text,
+  receive_address text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table public.task_order_claims
+  add constraint task_order_claims_unique_task_user unique (task_id, user_id);
+
+alter table public.task_order_claims enable row level security;
+
+drop policy if exists "Users can manage own task order claims" on public.task_order_claims;
+create policy "Users can manage own task order claims"
+  on public.task_order_claims for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Admins can manage all task order claims" on public.task_order_claims;
+create policy "Admins can manage all task order claims"
+  on public.task_order_claims for all
+  using (
+    exists (
+      select 1 from public.profiles
+      where profiles.id = auth.uid() and profiles.role = 'admin'
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.profiles
+      where profiles.id = auth.uid() and profiles.role = 'admin'
+    )
+  );
