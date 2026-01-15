@@ -13,6 +13,12 @@ export type TransactionStatus = 'pending' | 'completed' | 'failed';
 // 审核状态
 export type ReviewStatus = 'pending' | 'approved' | 'rejected';
 
+// 抢单任务状态
+export type TaskOrderStatus = 'open' | 'closed';
+
+// 抢单任务接单状态
+export type TaskOrderClaimStatus = 'claimed' | 'submitted' | 'approved' | 'rejected';
+
 // 用户Profile
 export interface Profile {
   id: string;
@@ -155,4 +161,31 @@ export interface Announcement {
   priority: 'low' | 'normal' | 'high';
   created_at: string;
   created_by?: string;
+}
+
+// 抢单任务
+export interface TaskOrder {
+  id: string;
+  title: string;
+  description: string | null;
+  reward: number;
+  max_claims: number | null;
+  status: TaskOrderStatus;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// 抢单任务接单与交付
+export interface TaskOrderClaim {
+  id: string;
+  task_id: string;
+  user_id: string;
+  status: TaskOrderClaimStatus;
+  proof_url: string | null;
+  proof_notes: string | null;
+  receive_username: string | null;
+  receive_address: string | null;
+  created_at: string;
+  updated_at: string;
 }

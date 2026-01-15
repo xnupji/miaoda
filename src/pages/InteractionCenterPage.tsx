@@ -1,16 +1,19 @@
 import { Loader2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWeb3 } from '@/contexts/Web3Context';
-import { bindWalletAddress, createInteractionSubmission, getUserInteractionSubmissions } from '@/db/api';
-import type { InteractionSubmission } from '@/types/types';
+import { bindWalletAddress, claimTaskOrder, createInteractionSubmission, getMyTaskOrderClaims, getOpenTaskOrders, getUserInteractionSubmissions, submitTaskOrderProof } from '@/db/api';
+import type { InteractionSubmission, TaskOrder, TaskOrderClaim } from '@/types/types';
 
 export default function InteractionCenterPage() {
   const { profile, refreshProfile } = useAuth();
@@ -22,17 +25,60 @@ export default function InteractionCenterPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [binding, setBinding] = useState(false);
+  const [taskOrders, setTaskOrders] = useState<TaskOrder[]>([]);
+  const [taskOrdersLoading, setTaskOrdersLoading] = useState(false);
+  const [myClaims, setMyClaims] = useState<TaskOrderClaim[]>([]);
+  const [myClaimsLoading, setMyClaimsLoading] = useState(false);
+  const [claimingTaskId, setClaimingTaskId] = useState<string | null>(null);
+  const [proofDialogOpen, setProofDialogOpen] = useState(false);
+  const [selectedClaim, setSelectedClaim] = useState<TaskOrderClaim | null>(null);
+  const [proofForm, setProofForm] = useState({
+    proofUrl: '',
+    proofNotes: '',
+    receiveUsername: '',
+    receiveAddress: '',
+  });
+  const [submittingProof, setSubmittingProof] = useState(false);
+
+  const taskMap = useMemo(() => {
+    const map = new Map<string, TaskOrder>();
+    for (const task of taskOrders) {
+      map.set(task.id, task);
+    }
+    return map;
+  }, [taskOrders]);
 
   // Fetch submissions on mount
   useEffect(() => {
     loadSubmissions();
   }, []);
 
+  useEffect(() => {
+    if (activeTab === 'tasks') {
+      loadTaskOrders();
+      loadMyClaims();
+    }
+  }, [activeTab]);
+
   async function loadSubmissions() {
     setLoading(true);
     const data = await getUserInteractionSubmissions();
     setSubmissions(data);
     setLoading(false);
+  }
+
+  async function loadTaskOrders() {
+    setTaskOrdersLoading(true);
+    const data = await getOpenTaskOrders();
+    setTaskOrders(data);
+    setTaskOrdersLoading(false);
+  }
+
+  async function loadMyClaims() {
+    setMyClaimsLoading(true);
+    const data = await getMyTaskOrderClaims();
+    setMyClaims(data);
+    setMyClaimsLoading(false);
   }
 
   const handleSubmit = async () => {
@@ -80,6 +126,62 @@ export default function InteractionCenterPage() {
       toast.error('提交失败');
     }
     setSubmitting(false);
+  };
+
+  const handleClaimTask = async (taskId: string) => {
+    if (!profile) {
+      toast.error('请先登录');
+      return;
+    }
+    setClaimingTaskId(taskId);
+    const res = await claimTaskOrder(taskId);
+    setClaimingTaskId(null);
+    if (res.ok) {
+      toast.success('抢单成功，请按要求完成任务并提交交付信息');
+      loadTaskOrders();
+      loadMyClaims();
+    } else {
+      toast.error(res.error || '抢单失败，请稍后重试');
+    }
+  };
+
+  const openProofDialog = (claim: TaskOrderClaim) => {
+    setSelectedClaim(claim);
+    setProofForm({
+      proofUrl: claim.proof_url || '',
+      proofNotes: claim.proof_notes || '',
+      receiveUsername: claim.receive_username || profile?.username || '',
+      receiveAddress: claim.receive_address || '',
+    });
+    setProofDialogOpen(true);
+  };
+
+  const handleSubmitProof = async () => {
+    if (!selectedClaim) return;
+    if (!proofForm.receiveUsername.trim()) {
+      toast.error('请输入用户名');
+      return;
+    }
+    if (!proofForm.receiveAddress.trim()) {
+      toast.error('请输入接收地址');
+      return;
+    }
+    setSubmittingProof(true);
+    const ok = await submitTaskOrderProof(selectedClaim.id, {
+      proofUrl: proofForm.proofUrl.trim() || null,
+      proofNotes: proofForm.proofNotes.trim() || null,
+      receiveUsername: proofForm.receiveUsername.trim(),
+      receiveAddress: proofForm.receiveAddress.trim(),
+    });
+    setSubmittingProof(false);
+    if (ok) {
+      toast.success('交付信息提交成功，等待管理员审核');
+      setProofDialogOpen(false);
+      setSelectedClaim(null);
+      loadMyClaims();
+    } else {
+      toast.error('提交失败，请稍后重试');
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -155,88 +257,357 @@ export default function InteractionCenterPage() {
         <TabsList>
           <TabsTrigger value="community">社区地址交互</TabsTrigger>
           <TabsTrigger value="institution">机构交付中心</TabsTrigger>
+          <TabsTrigger value="tasks">任务抢单</TabsTrigger>
         </TabsList>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{activeTab === 'community' ? '社区地址交互' : '机构交付中心'}</CardTitle>
-            <CardDescription>
-              {activeTab === 'community' 
-                ? '批量提交社区成员钱包地址进行审核，单次最多1000个。' 
-                : '机构批量交付地址审核，单次最多10000个。'}
-              审核通过后将发放空投代币。
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Textarea
-              placeholder="请输入钱包地址，每行一个地址"
-              className="min-h-[200px]"
-              value={activeTab === 'community' ? communityAddresses : institutionAddresses}
-              onChange={(e) => {
-                if (activeTab === 'community') setCommunityAddresses(e.target.value);
-                else setInstitutionAddresses(e.target.value);
-              }}
-            />
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">
-                当前行数: {(activeTab === 'community' ? communityAddresses : institutionAddresses).split('\n').filter(l => l.trim()).length} / {activeTab === 'community' ? 1000 : 10000}
-              </span>
-              <Button
-                onClick={handleSubmit}
-                disabled={submitting}
-              >
-                {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                提交审核
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        {activeTab !== 'tasks' && (
+          <>
+            <Card>
+              <CardHeader>
+                <CardTitle>{activeTab === 'community' ? '社区地址交互' : '机构交付中心'}</CardTitle>
+                <CardDescription>
+                  {activeTab === 'community' 
+                    ? '批量提交社区成员钱包地址进行审核，单次最多1000个。' 
+                    : '机构批量交付地址审核，单次最多10000个。'}
+                  审核通过后将发放空投代币。
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Textarea
+                  placeholder="请输入钱包地址，每行一个地址"
+                  className="min-h-[200px]"
+                  value={activeTab === 'community' ? communityAddresses : institutionAddresses}
+                  onChange={(e) => {
+                    if (activeTab === 'community') setCommunityAddresses(e.target.value);
+                    else setInstitutionAddresses(e.target.value);
+                  }}
+                />
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">
+                    当前行数: {(activeTab === 'community' ? communityAddresses : institutionAddresses).split('\n').filter(l => l.trim()).length} / {activeTab === 'community' ? 1000 : 10000}
+                  </span>
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={submitting}
+                  >
+                    {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    提交审核
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>提交记录</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex justify-center p-4">
-                <Loader2 className="h-6 w-6 animate-spin" />
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>类型</TableHead>
-                    <TableHead>提交时间</TableHead>
-                    <TableHead>地址数量</TableHead>
-                    <TableHead>状态</TableHead>
-                    <TableHead>反馈</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {submissions.map((sub) => (
-                    <TableRow key={sub.id}>
-                      <TableCell>
-                        {sub.type === 'community' ? '社区交互' : '机构交付'}
-                      </TableCell>
-                      <TableCell>{new Date(sub.created_at).toLocaleString()}</TableCell>
-                      <TableCell>{sub.addresses.length}</TableCell>
-                      <TableCell>{getStatusBadge(sub.status)}</TableCell>
-                      <TableCell>{sub.feedback || '-'}</TableCell>
-                    </TableRow>
-                  ))}
-                  {submissions.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground">
-                        暂无提交记录
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>提交记录</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="flex justify-center p-4">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>类型</TableHead>
+                        <TableHead>提交时间</TableHead>
+                        <TableHead>地址数量</TableHead>
+                        <TableHead>状态</TableHead>
+                        <TableHead>反馈</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {submissions.map((sub) => (
+                        <TableRow key={sub.id}>
+                          <TableCell>
+                            {sub.type === 'community' ? '社区交互' : '机构交付'}
+                          </TableCell>
+                          <TableCell>{new Date(sub.created_at).toLocaleString()}</TableCell>
+                          <TableCell>{sub.addresses.length}</TableCell>
+                          <TableCell>{getStatusBadge(sub.status)}</TableCell>
+                          <TableCell>{sub.feedback || '-'}</TableCell>
+                        </TableRow>
+                      ))}
+                      {submissions.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-muted-foreground">
+                            暂无提交记录
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </>
+        )}
+
+        {activeTab === 'tasks' && (
+          <>
+            <Card>
+              <CardHeader>
+                <CardTitle>可抢任务</CardTitle>
+                <CardDescription>选择下方任务进行抢单，完成后提交交付信息</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {taskOrdersLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  </div>
+                ) : taskOrders.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    暂无开放任务，稍后再来看看
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>标题</TableHead>
+                        <TableHead>说明</TableHead>
+                        <TableHead>奖励金额</TableHead>
+                        <TableHead>状态</TableHead>
+                        <TableHead className="text-right">操作</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {taskOrders.map((task) => {
+                        const claimed = myClaims.some((c) => c.task_id === task.id);
+                        return (
+                          <TableRow key={task.id}>
+                            <TableCell className="font-medium">{task.title}</TableCell>
+                            <TableCell className="max-w-xs text-sm text-muted-foreground">
+                              {task.description || '-'}
+                            </TableCell>
+                            <TableCell>{task.reward}</TableCell>
+                            <TableCell>
+                              {task.status === 'open' ? (
+                                <Badge variant="success" className="bg-green-500/10 text-green-500">
+                                  可抢
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary" className="bg-gray-500/10 text-gray-500">
+                                  已关闭
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                size="sm"
+                                disabled={task.status !== 'open' || claimed || claimingTaskId === task.id}
+                                onClick={() => handleClaimTask(task.id)}
+                              >
+                                {claimingTaskId === task.id && (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                )}
+                                {claimed ? '已抢单' : '抢单'}
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>我的任务</CardTitle>
+                <CardDescription>查看已抢任务，提交交付凭证和收货信息</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {myClaimsLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                  </div>
+                ) : myClaims.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    暂无抢单记录
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>任务</TableHead>
+                        <TableHead>抢单时间</TableHead>
+                        <TableHead>状态</TableHead>
+                        <TableHead>交付凭证</TableHead>
+                        <TableHead>收货信息</TableHead>
+                        <TableHead className="text-right">操作</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {myClaims.map((claim) => {
+                        const task = taskMap.get(claim.task_id);
+                        return (
+                          <TableRow key={claim.id}>
+                            <TableCell className="text-sm">
+                              {task ? task.title : claim.task_id}
+                            </TableCell>
+                          <TableCell className="text-sm">
+                            {new Date(claim.created_at).toLocaleString()}
+                          </TableCell>
+                          <TableCell>
+                            {claim.status === 'claimed' && (
+                              <Badge variant="secondary" className="bg-yellow-500/10 text-yellow-500">
+                                已抢单，待提交
+                              </Badge>
+                            )}
+                            {claim.status === 'submitted' && (
+                              <Badge variant="secondary" className="bg-blue-500/10 text-blue-500">
+                                已提交，待审核
+                              </Badge>
+                            )}
+                            {claim.status === 'approved' && (
+                              <Badge variant="secondary" className="bg-green-500/10 text-green-500">
+                                已通过
+                              </Badge>
+                            )}
+                            {claim.status === 'rejected' && (
+                              <Badge variant="secondary" className="bg-red-500/10 text-red-500">
+                                已拒绝
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm max-w-xs break-words">
+                            {claim.proof_url ? (
+                              <a
+                                href={claim.proof_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-primary underline"
+                              >
+                                查看链接
+                              </a>
+                            ) : (
+                              '-'
+                            )}
+                            {claim.proof_notes && (
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                {claim.proof_notes}
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm max-w-xs break-words">
+                            {claim.receive_username || claim.receive_address ? (
+                              <>
+                                <div>用户名：{claim.receive_username || '-'}</div>
+                                <div>收货地址：{claim.receive_address || '-'}</div>
+                              </>
+                            ) : (
+                              '-'
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {claim.status === 'claimed' && (
+                              <Button size="sm" onClick={() => openProofDialog(claim)}>
+                                提交交付信息
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </>
+        )}
       </Tabs>
+      <Dialog
+        open={proofDialogOpen}
+        onOpenChange={(open) => {
+          setProofDialogOpen(open);
+          if (!open) {
+            setSelectedClaim(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>提交交付信息</DialogTitle>
+            <DialogDescription>
+              完成任务后，在此上传交付凭证，并填写用户名和接收地址
+            </DialogDescription>
+          </DialogHeader>
+          {selectedClaim && (
+            <div className="space-y-4">
+              <div className="space-y-1 text-sm text-muted-foreground">
+                <div>任务ID：{selectedClaim.task_id}</div>
+                <div>抢单时间：{new Date(selectedClaim.created_at).toLocaleString()}</div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="proof-url">交付凭证链接</Label>
+                <Input
+                  id="proof-url"
+                  placeholder="例如 图片或文档链接，可选"
+                  value={proofForm.proofUrl}
+                  onChange={(e) =>
+                    setProofForm((prev) => ({ ...prev, proofUrl: e.target.value }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="proof-notes">交付说明</Label>
+                <Textarea
+                  id="proof-notes"
+                  placeholder="补充说明本次交付的内容，可选"
+                  className="min-h-[100px]"
+                  value={proofForm.proofNotes}
+                  onChange={(e) =>
+                    setProofForm((prev) => ({ ...prev, proofNotes: e.target.value }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="receive-username">用户名</Label>
+                <Input
+                  id="receive-username"
+                  placeholder="请输入接收人用户名"
+                  value={proofForm.receiveUsername}
+                  onChange={(e) =>
+                    setProofForm((prev) => ({ ...prev, receiveUsername: e.target.value }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="receive-address">接收地址</Label>
+                <Textarea
+                  id="receive-address"
+                  placeholder="请输入详细接收地址"
+                  className="min-h-[80px]"
+                  value={proofForm.receiveAddress}
+                  onChange={(e) =>
+                    setProofForm((prev) => ({ ...prev, receiveAddress: e.target.value }))
+                  }
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setProofDialogOpen(false);
+                    setSelectedClaim(null);
+                  }}
+                >
+                  取消
+                </Button>
+                <Button onClick={handleSubmitProof} disabled={submittingProof}>
+                  {submittingProof && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  提交
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

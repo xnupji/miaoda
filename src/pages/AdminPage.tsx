@@ -12,25 +12,30 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import {
   createAnnouncement,
+  createTaskOrder,
   deleteAnnouncement,
   getAllInteractionSubmissions,
   getAllMasterNodeApplications,
   getAllProfiles,
+  getAllTaskOrders,
   getAllWithdrawalRequests,
   getAnnouncements,
   getHTPPrice,
   getPlatformConfig,
   getSystemSetting,
+  getTaskOrderClaims,
   reviewMasterNodeApplication,
+  reviewTaskOrderClaim,
   reviewWithdrawalRequest,
   triggerAirdrop,
   updateAnnouncement,
   updateInteractionSubmissionStatus,
   updateSystemSetting,
+  updateTaskOrderStatus,
   updateUserRole,
 } from '@/db/api';
 import { supabase } from '@/db/supabase';
-import type { Announcement, InteractionSubmission, MasterNodeApplication, Profile, WithdrawalRequest } from '@/types/types';
+import type { Announcement, InteractionSubmission, MasterNodeApplication, Profile, TaskOrder, TaskOrderClaim, WithdrawalRequest } from '@/types/types';
 
 export default function AdminPage() {
   const [users, setUsers] = useState<Profile[]>([]);
@@ -66,6 +71,22 @@ export default function AdminPage() {
     data: Partial<Announcement>;
   }>({ open: false, mode: 'create', data: {} });
   const [submittingAnnouncement, setSubmittingAnnouncement] = useState(false);
+
+  const [taskOrders, setTaskOrders] = useState<TaskOrder[]>([]);
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [taskForm, setTaskForm] = useState({
+    title: '',
+    description: '',
+    reward: '',
+    maxClaims: '',
+  });
+  const [creatingTask, setCreatingTask] = useState(false);
+  const [updatingTaskStatusId, setUpdatingTaskStatusId] = useState<string | null>(null);
+  const [taskClaimsDialogOpen, setTaskClaimsDialogOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<TaskOrder | null>(null);
+  const [taskClaims, setTaskClaims] = useState<TaskOrderClaim[]>([]);
+  const [taskClaimsLoading, setTaskClaimsLoading] = useState(false);
+  const [reviewingClaimId, setReviewingClaimId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -117,17 +138,19 @@ export default function AdminPage() {
     setLoading(true);
     try {
       // Load core data first
-      const [usersData, withdrawalsData, masterNodesData, interactionsData] = await Promise.all([
+      const [usersData, withdrawalsData, masterNodesData, interactionsData, taskOrdersData] = await Promise.all([
         getAllProfiles(),
         getAllWithdrawalRequests(),
         getAllMasterNodeApplications(),
         getAllInteractionSubmissions(),
+        getAllTaskOrders(),
       ]);
       
       setUsers(usersData);
       setWithdrawals(withdrawalsData);
       setMasterNodes(masterNodesData);
       setInteractions(interactionsData);
+      setTaskOrders(taskOrdersData);
 
       // Load announcements separately to prevent page crash if table is missing
       try {
@@ -220,6 +243,91 @@ export default function AdminPage() {
     }
 
     setProcessing(false);
+  };
+
+  const handleCreateTaskOrder = async () => {
+    if (!taskForm.title.trim()) {
+      toast.error('请输入任务标题');
+      return;
+    }
+
+    const reward = parseFloat(taskForm.reward);
+    if (isNaN(reward) || reward <= 0) {
+      toast.error('请输入有效的奖励金额');
+      return;
+    }
+
+    let maxClaims: number | null = null;
+    if (taskForm.maxClaims.trim()) {
+      const parsed = parseInt(taskForm.maxClaims, 10);
+      if (isNaN(parsed) || parsed <= 0) {
+        toast.error('最大抢单数必须为正整数');
+        return;
+      }
+      maxClaims = parsed;
+    }
+
+    setCreatingTask(true);
+    const ok = await createTaskOrder(
+      taskForm.title.trim(),
+      taskForm.description.trim(),
+      reward,
+      maxClaims,
+    );
+    setCreatingTask(false);
+
+    if (ok) {
+      toast.success('抢单任务创建成功');
+      setTaskDialogOpen(false);
+      setTaskForm({
+        title: '',
+        description: '',
+        reward: '',
+        maxClaims: '',
+      });
+      await loadData();
+    } else {
+      toast.error('创建抢单任务失败');
+    }
+  };
+
+  const handleToggleTaskStatus = async (task: TaskOrder) => {
+    const nextStatus = task.status === 'open' ? 'closed' : 'open';
+    setUpdatingTaskStatusId(task.id);
+    const ok = await updateTaskOrderStatus(task.id, nextStatus);
+    setUpdatingTaskStatusId(null);
+    if (ok) {
+      toast.success(nextStatus === 'open' ? '任务已开放' : '任务已关闭');
+      await loadData();
+    } else {
+      toast.error('更新任务状态失败');
+    }
+  };
+
+  const handleOpenTaskClaims = async (task: TaskOrder) => {
+    setSelectedTask(task);
+    setTaskClaims([]);
+    setTaskClaimsDialogOpen(true);
+    setTaskClaimsLoading(true);
+    const claims = await getTaskOrderClaims(task.id);
+    setTaskClaims(claims);
+    setTaskClaimsLoading(false);
+  };
+
+  const handleReviewTaskClaim = async (claim: TaskOrderClaim, status: 'approved' | 'rejected') => {
+    setReviewingClaimId(claim.id);
+    const ok = await reviewTaskOrderClaim(claim.id, status);
+    setReviewingClaimId(null);
+
+    if (ok) {
+      toast.success(status === 'approved' ? '任务交付已通过' : '任务交付已拒绝');
+      if (selectedTask) {
+        const claims = await getTaskOrderClaims(selectedTask.id);
+        setTaskClaims(claims);
+      }
+    } else {
+      toast.error('更新任务交付状态失败');
+    }
   };
 
   const handleUpdateDeveloperAddress = async () => {
@@ -486,6 +594,10 @@ export default function AdminPage() {
               <Badge variant="destructive" className="ml-2">{pendingInteractions.length}</Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="tasks">
+            <FileCheck className="w-4 h-4 mr-2" />
+            抢单任务
+          </TabsTrigger>
 
           <TabsTrigger value="settings">
             <Settings className="w-4 h-4 mr-2" />
@@ -576,9 +688,230 @@ export default function AdminPage() {
                 </div>
               )}
             </CardContent>
-          </Card>
-        </TabsContent>
+      </Card>
+    </TabsContent>
 
+    <Dialog
+      open={taskDialogOpen}
+      onOpenChange={(open) => {
+        setTaskDialogOpen(open);
+        if (!open) {
+          setTaskForm({
+            title: '',
+            description: '',
+            reward: '',
+            maxClaims: '',
+          });
+        }
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>发布抢单任务</DialogTitle>
+          <DialogDescription>
+            设置任务标题、奖励金额和最大抢单数量
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="task-title">任务标题</Label>
+            <Input
+              id="task-title"
+              placeholder="请输入任务标题"
+              value={taskForm.title}
+              onChange={(e) => setTaskForm((prev) => ({ ...prev, title: e.target.value }))}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="task-description">任务说明</Label>
+            <Textarea
+              id="task-description"
+              placeholder="请输入任务具体要求、步骤等"
+              className="min-h-[120px]"
+              value={taskForm.description}
+              onChange={(e) => setTaskForm((prev) => ({ ...prev, description: e.target.value }))}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="task-reward">奖励金额</Label>
+              <Input
+                id="task-reward"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="例如 10"
+                value={taskForm.reward}
+                onChange={(e) => setTaskForm((prev) => ({ ...prev, reward: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="task-max-claims">最大抢单数</Label>
+              <Input
+                id="task-max-claims"
+                type="number"
+                min="0"
+                placeholder="留空表示不限"
+                value={taskForm.maxClaims}
+                onChange={(e) => setTaskForm((prev) => ({ ...prev, maxClaims: e.target.value }))}
+              />
+            </div>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setTaskDialogOpen(false);
+            }}
+          >
+            取消
+          </Button>
+          <Button onClick={handleCreateTaskOrder} disabled={creatingTask}>
+            {creatingTask && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            发布
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog
+      open={taskClaimsDialogOpen}
+      onOpenChange={(open) => {
+        setTaskClaimsDialogOpen(open);
+        if (!open) {
+          setSelectedTask(null);
+          setTaskClaims([]);
+        }
+      }}
+    >
+      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>任务抢单记录</DialogTitle>
+          <DialogDescription>
+            {selectedTask ? selectedTask.title : '请选择任务查看抢单记录'}
+          </DialogDescription>
+        </DialogHeader>
+        {taskClaimsLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        ) : taskClaims.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            暂无抢单记录
+          </div>
+        ) : (
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>用户</TableHead>
+                  <TableHead>抢单时间</TableHead>
+                  <TableHead>状态</TableHead>
+                  <TableHead>交付凭证</TableHead>
+                  <TableHead>收货信息</TableHead>
+                  <TableHead className="text-right">操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {taskClaims.map((claim) => {
+                  const user = users.find((u) => u.id === claim.user_id);
+                  return (
+                    <TableRow key={claim.id}>
+                      <TableCell className="font-medium">
+                        {user?.username || '未知用户'}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {new Date(claim.created_at).toLocaleString('zh-CN')}
+                      </TableCell>
+                      <TableCell>
+                        {claim.status === 'claimed' && (
+                          <Badge variant="secondary" className="bg-yellow-500/10 text-yellow-500">
+                            已抢单，待交付
+                          </Badge>
+                        )}
+                        {claim.status === 'submitted' && (
+                          <Badge variant="secondary" className="bg-blue-500/10 text-blue-500">
+                            已提交交付，待审核
+                          </Badge>
+                        )}
+                        {claim.status === 'approved' && (
+                          <Badge variant="secondary" className="bg-green-500/10 text-green-500">
+                            已通过
+                          </Badge>
+                        )}
+                        {claim.status === 'rejected' && (
+                          <Badge variant="secondary" className="bg-red-500/10 text-red-500">
+                            已拒绝
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm max-w-xs break-words">
+                        {claim.proof_url ? (
+                          <a
+                            href={claim.proof_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-primary underline"
+                          >
+                            查看链接
+                          </a>
+                        ) : (
+                          '-'
+                        )}
+                        {claim.proof_notes && (
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {claim.proof_notes}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm max-w-xs break-words">
+                        {claim.receive_username || claim.receive_address ? (
+                          <>
+                            <div>用户名：{claim.receive_username || '-'}</div>
+                            <div>收货地址：{claim.receive_address || '-'}</div>
+                          </>
+                        ) : (
+                          '-'
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {claim.status === 'submitted' && (
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="default"
+                              disabled={reviewingClaimId === claim.id}
+                              onClick={() => handleReviewTaskClaim(claim, 'approved')}
+                            >
+                              {reviewingClaimId === claim.id && (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              )}
+                              通过
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              disabled={reviewingClaimId === claim.id}
+                              onClick={() => handleReviewTaskClaim(claim, 'rejected')}
+                            >
+                              {reviewingClaimId === claim.id && (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              )}
+                              拒绝
+                            </Button>
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
         {/* 用户管理 */}
         <TabsContent value="users">
           <Card>
@@ -1016,6 +1349,100 @@ export default function AdminPage() {
                           </TableRow>
                         );
                       })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="tasks">
+          <Card>
+            <CardHeader className="flex items-center justify-between">
+              <div>
+                <CardTitle>抢单任务管理</CardTitle>
+                <CardDescription>发布任务并查看用户抢单与交付情况</CardDescription>
+              </div>
+              <Button
+                onClick={() => {
+                  setTaskForm({
+                    title: '',
+                    description: '',
+                    reward: '',
+                    maxClaims: '',
+                  });
+                  setTaskDialogOpen(true);
+                }}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                发布任务
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : taskOrders.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  暂无抢单任务
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>标题</TableHead>
+                        <TableHead>奖励金额</TableHead>
+                        <TableHead>最大抢单数</TableHead>
+                        <TableHead>状态</TableHead>
+                        <TableHead>创建时间</TableHead>
+                        <TableHead className="text-right">操作</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {taskOrders.map((task) => (
+                        <TableRow key={task.id}>
+                          <TableCell className="font-medium">{task.title}</TableCell>
+                          <TableCell>{task.reward}</TableCell>
+                          <TableCell>{task.max_claims ?? '不限'}</TableCell>
+                          <TableCell>
+                            {task.status === 'open' ? (
+                              <Badge variant="success" className="bg-green-500/10 text-green-500">
+                                已开放
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="bg-gray-500/10 text-gray-500">
+                                已关闭
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {new Date(task.created_at).toLocaleString('zh-CN')}
+                          </TableCell>
+                          <TableCell className="text-right space-x-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleOpenTaskClaims(task)}
+                            >
+                              抢单记录
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant={task.status === 'open' ? 'destructive' : 'default'}
+                              disabled={updatingTaskStatusId === task.id}
+                              onClick={() => handleToggleTaskStatus(task)}
+                            >
+                              {updatingTaskStatusId === task.id && (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              )}
+                              {task.status === 'open' ? '关闭任务' : '重新开放'}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
                     </TableBody>
                   </Table>
                 </div>

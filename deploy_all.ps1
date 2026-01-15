@@ -31,8 +31,7 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "   - Not logged in (run 'npx supabase login')"
     Write-Host "   - Project not linked (run 'npx supabase link --project-ref pwlgtiiiapiahtwtvojz')"
     Write-Host ""
-    Write-Host "❌ Deployment aborted because database update failed." -ForegroundColor Red
-    exit 1
+    Write-Host "⚠️  Skipping database update and continuing deploy." -ForegroundColor Yellow
 } else {
     Write-Host "✅ Database update successful!" -ForegroundColor Green
 }

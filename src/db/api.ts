@@ -8,6 +8,10 @@ import type {
   PlatformConfig,
   Profile,
   SystemSetting,
+  TaskOrder,
+  TaskOrderClaim,
+  TaskOrderClaimStatus,
+  TaskOrderStatus,
   Transaction,
   WithdrawalRequest,
 } from '@/types/types';
@@ -847,6 +851,189 @@ export async function updateInteractionSubmissionStatus(
 
   if (error) {
     console.error('更新交互提交状态失败:', error);
+    return false;
+  }
+
+  return true;
+}
+
+// ==================== 抢单任务相关 ====================
+
+export async function createTaskOrder(
+  title: string,
+  description: string,
+  reward: number,
+  maxClaims: number | null
+): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const { error } = await supabase
+    .from('task_orders')
+    .insert({
+      title,
+      description,
+      reward,
+      max_claims: maxClaims,
+      created_by: user.id,
+    });
+
+  if (error) {
+    console.error('创建抢单任务失败:', error);
+    return false;
+  }
+
+  return true;
+}
+
+export async function getAllTaskOrders(): Promise<TaskOrder[]> {
+  const { data, error } = await supabase
+    .from('task_orders')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('获取抢单任务列表失败:', error);
+    return [];
+  }
+
+  return Array.isArray(data) ? data as TaskOrder[] : [];
+}
+
+export async function updateTaskOrderStatus(
+  id: string,
+  status: TaskOrderStatus
+): Promise<boolean> {
+  const { error } = await supabase
+    .from('task_orders')
+    .update({
+      status,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id);
+
+  if (error) {
+    console.error('更新抢单任务状态失败:', error);
+    return false;
+  }
+
+  return true;
+}
+
+export async function getOpenTaskOrders(): Promise<TaskOrder[]> {
+  const { data, error } = await supabase
+    .from('task_orders')
+    .select('*')
+    .eq('status', 'open')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('获取开放抢单任务失败:', error);
+    return [];
+  }
+
+  return Array.isArray(data) ? data as TaskOrder[] : [];
+}
+
+export async function claimTaskOrder(taskId: string): Promise<{ ok: boolean; error?: string }> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: '未登录' };
+
+  const { error } = await supabase
+    .from('task_order_claims')
+    .insert({
+      task_id: taskId,
+      user_id: user.id,
+      status: 'claimed',
+    });
+
+  if (error) {
+    if (error.code === '23505') {
+      return { ok: false, error: '您已经抢过该任务' };
+    }
+    console.error('抢单失败:', error);
+    return { ok: false, error: '抢单失败，请稍后重试' };
+  }
+
+  return { ok: true };
+}
+
+export async function submitTaskOrderProof(
+  claimId: string,
+  payload: {
+    proofUrl: string | null;
+    proofNotes: string | null;
+    receiveUsername: string;
+    receiveAddress: string;
+  }
+): Promise<boolean> {
+  const { error } = await supabase
+    .from('task_order_claims')
+    .update({
+      proof_url: payload.proofUrl,
+      proof_notes: payload.proofNotes,
+      receive_username: payload.receiveUsername,
+      receive_address: payload.receiveAddress,
+      status: 'submitted',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', claimId);
+
+  if (error) {
+    console.error('提交任务交付凭证失败:', error);
+    return false;
+  }
+
+  return true;
+}
+
+export async function getMyTaskOrderClaims(): Promise<TaskOrderClaim[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from('task_order_claims')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('获取我的抢单记录失败:', error);
+    return [];
+  }
+
+  return Array.isArray(data) ? data as TaskOrderClaim[] : [];
+}
+
+export async function getTaskOrderClaims(taskId: string): Promise<TaskOrderClaim[]> {
+  const { data, error } = await supabase
+    .from('task_order_claims')
+    .select('*')
+    .eq('task_id', taskId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('获取任务抢单记录失败:', error);
+    return [];
+  }
+
+  return Array.isArray(data) ? data as TaskOrderClaim[] : [];
+}
+
+export async function reviewTaskOrderClaim(
+  claimId: string,
+  status: TaskOrderClaimStatus
+): Promise<boolean> {
+  const { error } = await supabase
+    .from('task_order_claims')
+    .update({
+      status,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', claimId);
+
+  if (error) {
+    console.error('更新任务抢单审核状态失败:', error);
     return false;
   }
 
