@@ -21,6 +21,7 @@ const transactionTypeLabels: Record<TransactionType, string> = {
   withdrawal: '提币',
   transfer_in: '转入',
   transfer_out: '转出',
+  task_order_reward: '任务奖励',
 };
 
 const transactionTypeColors: Record<TransactionType, string> = {
@@ -30,6 +31,7 @@ const transactionTypeColors: Record<TransactionType, string> = {
   withdrawal: 'text-destructive',
   transfer_in: 'text-green-500',
   transfer_out: 'text-orange-500',
+  task_order_reward: 'text-primary',
 };
 
 export default function TransactionsPage() {

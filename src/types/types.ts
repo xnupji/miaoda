@@ -5,7 +5,7 @@ export type UserRole = 'user' | 'admin' | 'master_node';
 export type TokenType = 'HTP' | 'USDT';
 
 // 交易类型
-export type TransactionType = 'mining' | 'invitation_reward' | 'master_node_reward' | 'withdrawal' | 'transfer_in' | 'transfer_out';
+export type TransactionType = 'mining' | 'invitation_reward' | 'master_node_reward' | 'withdrawal' | 'transfer_in' | 'transfer_out' | 'task_order_reward';
 
 // 交易状态
 export type TransactionStatus = 'pending' | 'completed' | 'failed';
@@ -170,6 +170,10 @@ export interface TaskOrder {
   description: string | null;
   reward: number;
   max_claims: number | null;
+  image_url?: string | null;
+  deadline_at?: string | null;
+  total_claims?: number | null;
+  approved_claims?: number | null;
   status: TaskOrderStatus;
   created_by: string;
   created_at: string;

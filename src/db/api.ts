@@ -863,7 +863,9 @@ export async function createTaskOrder(
   title: string,
   description: string,
   reward: number,
-  maxClaims: number | null
+  maxClaims: number | null,
+  imageUrl: string | null,
+  deadlineAt: string | null
 ): Promise<boolean> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return false;
@@ -875,6 +877,8 @@ export async function createTaskOrder(
       description,
       reward,
       max_claims: maxClaims,
+      image_url: imageUrl,
+      deadline_at: deadlineAt,
       created_by: user.id,
     });
 
@@ -921,10 +925,13 @@ export async function updateTaskOrderStatus(
 }
 
 export async function getOpenTaskOrders(): Promise<TaskOrder[]> {
+  const nowIso = new Date().toISOString();
+
   const { data, error } = await supabase
     .from('task_orders')
     .select('*')
     .eq('status', 'open')
+    .or('deadline_at.is.null,deadline_at.gt.' + nowIso)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -938,6 +945,42 @@ export async function getOpenTaskOrders(): Promise<TaskOrder[]> {
 export async function claimTaskOrder(taskId: string): Promise<{ ok: boolean; error?: string }> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: '未登录' };
+
+  const { data: task, error: taskError } = await supabase
+    .from('task_orders')
+    .select('*')
+    .eq('id', taskId)
+    .single();
+
+  if (taskError || !task) {
+    console.error('获取任务详情失败:', taskError);
+    return { ok: false, error: '任务不存在或已被删除' };
+  }
+
+  if (task.status !== 'open') {
+    return { ok: false, error: '任务已关闭' };
+  }
+
+  if (task.deadline_at && new Date(task.deadline_at) <= new Date()) {
+    return { ok: false, error: '任务已过截止时间' };
+  }
+
+  if (typeof task.max_claims === 'number' && task.max_claims > 0) {
+    const { data: claimsCountData, error: claimsCountError } = await supabase
+      .from('task_order_claims')
+      .select('id', { count: 'exact', head: true })
+      .eq('task_id', taskId);
+
+    if (claimsCountError) {
+      console.error('统计任务抢单数量失败:', claimsCountError);
+      return { ok: false, error: '抢单失败，请稍后重试' };
+    }
+
+    const claimsCount = (claimsCountData as any)?.length ?? 0;
+    if (claimsCount >= task.max_claims) {
+      return { ok: false, error: '任务抢单人数已满' };
+    }
+  }
 
   const { error } = await supabase
     .from('task_order_claims')

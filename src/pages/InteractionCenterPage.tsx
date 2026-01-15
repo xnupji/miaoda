@@ -1,5 +1,5 @@
 import { Loader2 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWeb3 } from '@/contexts/Web3Context';
+import { supabase } from '@/db/supabase';
 import { bindWalletAddress, claimTaskOrder, createInteractionSubmission, getMyTaskOrderClaims, getOpenTaskOrders, getUserInteractionSubmissions, submitTaskOrderProof } from '@/db/api';
 import type { InteractionSubmission, TaskOrder, TaskOrderClaim } from '@/types/types';
 
@@ -39,6 +40,8 @@ export default function InteractionCenterPage() {
     receiveAddress: '',
   });
   const [submittingProof, setSubmittingProof] = useState(false);
+  const [uploadingProofImage, setUploadingProofImage] = useState(false);
+  const proofFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const taskMap = useMemo(() => {
     const map = new Map<string, TaskOrder>();
@@ -154,6 +157,51 @@ export default function InteractionCenterPage() {
       receiveAddress: claim.receive_address || '',
     });
     setProofDialogOpen(true);
+  };
+
+  const handleChooseProofImage = () => {
+    if (uploadingProofImage) return;
+    proofFileInputRef.current?.click();
+  };
+
+  const handleProofFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedClaim) return;
+    if (!profile) {
+      toast.error('请先登录');
+      return;
+    }
+    setUploadingProofImage(true);
+    const toastId = toast.loading('正在上传图片...');
+    try {
+      const ext = file.name.split('.').pop() || 'jpg';
+      const fileName = `task-proofs/${profile.id}/${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('support-attachments')
+        .upload(fileName, file);
+      if (uploadError) {
+        throw uploadError;
+      }
+      const { data: publicData } = supabase.storage
+        .from('support-attachments')
+        .getPublicUrl(fileName);
+      const publicUrl = (publicData as any)?.publicUrl || (publicData as any)?.public_url;
+      if (!publicUrl) {
+        throw new Error('获取图片地址失败');
+      }
+      setProofForm((prev) => ({
+        ...prev,
+        proofUrl: publicUrl,
+      }));
+      toast.success('图片上传成功', { id: toastId });
+    } catch (error: any) {
+      toast.error('图片上传失败: ' + (error.message || '未知错误'), { id: toastId });
+    } finally {
+      setUploadingProofImage(false);
+      if (proofFileInputRef.current) {
+        proofFileInputRef.current.value = '';
+      }
+    }
   };
 
   const handleSubmitProof = async () => {
@@ -349,7 +397,9 @@ export default function InteractionCenterPage() {
             <Card>
               <CardHeader>
                 <CardTitle>可抢任务</CardTitle>
-                <CardDescription>选择下方任务进行抢单，完成后提交交付信息</CardDescription>
+                <CardDescription>
+                  选择下方任务进行抢单，奖励以美元结算，请在截止日期前完成并提交交付信息
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {taskOrdersLoading ? (
@@ -367,6 +417,8 @@ export default function InteractionCenterPage() {
                         <TableHead>标题</TableHead>
                         <TableHead>说明</TableHead>
                         <TableHead>奖励金额</TableHead>
+                        <TableHead>完成进度</TableHead>
+                        <TableHead>截止日期</TableHead>
                         <TableHead>状态</TableHead>
                         <TableHead className="text-right">操作</TableHead>
                       </TableRow>
@@ -374,13 +426,43 @@ export default function InteractionCenterPage() {
                     <TableBody>
                       {taskOrders.map((task) => {
                         const claimed = myClaims.some((c) => c.task_id === task.id);
+                        const maxClaims = task.max_claims ?? 0;
+                        const approved = task.approved_claims ?? 0;
+                        const progress = maxClaims > 0 ? Math.min(100, (approved / maxClaims) * 100) : 0;
+                        const deadlineLabel = task.deadline_at
+                          ? new Date(task.deadline_at).toLocaleDateString('zh-CN')
+                          : '不限';
+
                         return (
                           <TableRow key={task.id}>
                             <TableCell className="font-medium">{task.title}</TableCell>
                             <TableCell className="max-w-xs text-sm text-muted-foreground">
                               {task.description || '-'}
                             </TableCell>
-                            <TableCell>{task.reward}</TableCell>
+                            <TableCell>${task.reward.toFixed(2)}</TableCell>
+                            <TableCell className="min-w-[180px]">
+                              {maxClaims > 0 ? (
+                                <div className="space-y-1">
+                                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                    <span>已完成 {approved} / {maxClaims}</span>
+                                    <span>{progress.toFixed(0)}%</span>
+                                  </div>
+                                  <div className="h-2 w-full rounded-full bg-primary/10 overflow-hidden">
+                                    <div
+                                      className="h-full bg-primary"
+                                      style={{ width: `${progress}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">
+                                  已完成 {approved} 人（不限人数）
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {deadlineLabel}
+                            </TableCell>
                             <TableCell>
                               {task.status === 'open' ? (
                                 <Badge variant="success" className="bg-green-500/10 text-green-500">
@@ -532,7 +614,7 @@ export default function InteractionCenterPage() {
           <DialogHeader>
             <DialogTitle>提交交付信息</DialogTitle>
             <DialogDescription>
-              完成任务后，在此上传交付凭证，并填写用户名和接收地址
+              完成任务后，在此上传交付凭证，并填写用户名和钱包地址
             </DialogDescription>
           </DialogHeader>
           {selectedClaim && (
@@ -543,14 +625,28 @@ export default function InteractionCenterPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="proof-url">交付凭证链接</Label>
-                <Input
-                  id="proof-url"
-                  placeholder="例如 图片或文档链接，可选"
-                  value={proofForm.proofUrl}
-                  onChange={(e) =>
-                    setProofForm((prev) => ({ ...prev, proofUrl: e.target.value }))
-                  }
-                />
+                <div className="flex gap-2">
+                  <Input
+                    id="proof-url"
+                    className="flex-1"
+                    placeholder="例如 图片或文档链接，可选"
+                    value={proofForm.proofUrl}
+                    onChange={(e) =>
+                      setProofForm((prev) => ({ ...prev, proofUrl: e.target.value }))
+                    }
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleChooseProofImage}
+                    disabled={uploadingProofImage}
+                  >
+                    {uploadingProofImage && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    上传图片
+                  </Button>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="proof-notes">交付说明</Label>
@@ -576,10 +672,10 @@ export default function InteractionCenterPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="receive-address">接收地址</Label>
+                <Label htmlFor="receive-address">钱包地址</Label>
                 <Textarea
                   id="receive-address"
-                  placeholder="请输入详细接收地址"
+                  placeholder="请输入钱包地址"
                   className="min-h-[80px]"
                   value={proofForm.receiveAddress}
                   onChange={(e) =>
@@ -608,6 +704,13 @@ export default function InteractionCenterPage() {
           )}
         </DialogContent>
       </Dialog>
+      <input
+        ref={proofFileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleProofFileChange}
+      />
     </div>
   );
 }
