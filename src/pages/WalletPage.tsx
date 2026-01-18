@@ -162,6 +162,10 @@ export default function WalletPage() {
         <p className="text-muted-foreground mt-2">管理您的钱包地址和提币操作</p>
       </div>
 
+      <div className="rounded-md border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs sm:text-sm text-yellow-900">
+        安全提示：本站不会以任何形式向您索取钱包私钥或助记词，请勿在任何网站输入这些信息。
+      </div>
+
       {/* 钱包连接状态 */}
       <Card className="glow-border">
         <CardHeader>

@@ -129,6 +129,9 @@ export default function LoginPage() {
           <CardDescription>基于BSC区块链的去中心化挖矿平台</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 rounded-md border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs sm:text-sm text-yellow-900">
+            安全提示：本站不会以任何形式向您索取钱包私钥或助记词，请勿在任何网站输入这些信息。
+          </div>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">登录</TabsTrigger>

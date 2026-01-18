@@ -240,6 +240,11 @@ export default function InteractionCenterPage() {
     }
   };
 
+  const getTaskTitle = (taskId: string) => {
+    const task = taskMap.get(taskId);
+    return task ? task.title : taskId;
+  };
+
   const handleBindWallet = async () => {
     if (!account) {
       toast.error('请先连接钱包');
@@ -394,6 +399,10 @@ export default function InteractionCenterPage() {
 
         {activeTab === 'tasks' && (
           <>
+            <div className="rounded-md border border-yellow-300 bg-yellow-50 px-3 py-2 text-xs sm:text-sm text-yellow-900">
+              安全提示：本站不会以任何形式向您索取钱包私钥或助记词，请勿在任何网站输入这些信息。
+            </div>
+
             <Card>
               <CardHeader>
                 <CardTitle>可抢任务</CardTitle>
@@ -411,86 +420,118 @@ export default function InteractionCenterPage() {
                     暂无开放任务，稍后再来看看
                   </div>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>标题</TableHead>
-                        <TableHead>说明</TableHead>
-                        <TableHead>奖励金额</TableHead>
-                        <TableHead>完成进度</TableHead>
-                        <TableHead>截止日期</TableHead>
-                        <TableHead>状态</TableHead>
-                        <TableHead className="text-right">操作</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {taskOrders.map((task) => {
-                        const claimed = myClaims.some((c) => c.task_id === task.id);
-                        const maxClaims = task.max_claims ?? 0;
-                        const approved = task.approved_claims ?? 0;
-                        const progress = maxClaims > 0 ? Math.min(100, (approved / maxClaims) * 100) : 0;
-                        const deadlineLabel = task.deadline_at
-                          ? new Date(task.deadline_at).toLocaleDateString('zh-CN')
-                          : '不限';
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {taskOrders.map((task) => {
+                      const claimed = myClaims.some((c) => c.task_id === task.id);
+                      const maxClaims = task.max_claims ?? 0;
+                      const approved = task.approved_claims ?? 0;
+                      const progress = maxClaims > 0 ? Math.min(100, (approved / maxClaims) * 100) : 0;
+                      const deadlineLabel = task.deadline_at
+                        ? new Date(task.deadline_at).toLocaleDateString('zh-CN')
+                        : '不限';
 
-                        return (
-                          <TableRow key={task.id}>
-                            <TableCell className="font-medium">{task.title}</TableCell>
-                            <TableCell className="max-w-xs text-sm text-muted-foreground">
-                              {task.description || '-'}
-                            </TableCell>
-                            <TableCell>${task.reward.toFixed(2)}</TableCell>
-                            <TableCell className="min-w-[180px]">
-                              {maxClaims > 0 ? (
-                                <div className="space-y-1">
-                                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                    <span>已完成 {approved} / {maxClaims}</span>
-                                    <span>{progress.toFixed(0)}%</span>
-                                  </div>
-                                  <div className="h-2 w-full rounded-full bg-primary/10 overflow-hidden">
-                                    <div
-                                      className="h-full bg-primary"
-                                      style={{ width: `${progress}%` }}
-                                    />
-                                  </div>
-                                </div>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">
-                                  已完成 {approved} 人（不限人数）
-                                </span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-sm">
-                              {deadlineLabel}
-                            </TableCell>
-                            <TableCell>
-                              {task.status === 'open' ? (
-                                <Badge variant="success" className="bg-green-500/10 text-green-500">
-                                  可抢
-                                </Badge>
-                              ) : (
-                                <Badge variant="secondary" className="bg-gray-500/10 text-gray-500">
-                                  已关闭
-                                </Badge>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                size="sm"
-                                disabled={task.status !== 'open' || claimed || claimingTaskId === task.id}
-                                onClick={() => handleClaimTask(task.id)}
-                              >
-                                {claimingTaskId === task.id && (
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      return (
+                        <div
+                          key={task.id}
+                          className="flex flex-col gap-4 rounded-lg border bg-muted/30 p-4"
+                        >
+                          <div className="flex gap-3">
+                            {task.image_url && (
+                              <div className="w-24 h-24 flex-shrink-0 overflow-hidden rounded-md bg-muted">
+                                <img
+                                  src={task.image_url}
+                                  alt={task.title}
+                                  className="h-full w-full object-cover"
+                                />
+                              </div>
+                            )}
+                            <div className="flex-1 space-y-2">
+                              <div className="text-base font-semibold leading-relaxed">
+                                {task.title}
+                              </div>
+                              <div className="text-xs text-muted-foreground uppercase tracking-wide">
+                                任务说明
+                              </div>
+                              <div className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap break-words">
+                                {task.description || '-'}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="space-y-3 rounded-md bg-background/80 p-3 text-sm leading-relaxed">
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="text-xs text-muted-foreground">奖励金额</div>
+                              <div className="text-base font-semibold whitespace-nowrap">
+                                ${task.reward.toFixed(2)}
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                <span>完成进度</span>
+                                {maxClaims > 0 && (
+                                  <span>{progress.toFixed(0)}%</span>
                                 )}
-                                {claimed ? '已抢单' : '抢单'}
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
+                              </div>
+                              <div>
+                                {maxClaims > 0 ? (
+                                  <div className="space-y-1">
+                                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                      <span>已完成 {approved} / {maxClaims}</span>
+                                    </div>
+                                    <div className="h-2 w-full rounded-full bg-primary/10 overflow-hidden">
+                                      <div
+                                        className="h-full bg-primary"
+                                        style={{ width: `${progress}%` }}
+                                      />
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">
+                                    已完成 {approved} 人（不限人数）
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="text-xs text-muted-foreground">截止日期</div>
+                              <div className="text-sm whitespace-nowrap">
+                                {deadlineLabel}
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="text-xs text-muted-foreground">任务状态</div>
+                              <div>
+                                {task.status === 'open' ? (
+                                  <Badge variant="success" className="bg-green-500/10 text-green-500">
+                                    可抢
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="secondary" className="bg-gray-500/10 text-gray-500">
+                                    已关闭
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between pt-2 border-t border-border/60">
+                            <div className="text-xs text-muted-foreground">
+                              如已抢单，请在完成任务后及时在“我的任务”中提交交付信息。
+                            </div>
+                            <Button
+                              size="sm"
+                              className="px-6"
+                              disabled={task.status !== 'open' || claimed || claimingTaskId === task.id}
+                              onClick={() => handleClaimTask(task.id)}
+                            >
+                              {claimingTaskId === task.id && (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              )}
+                              {claimed ? '已抢单' : '抢单'}
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -510,91 +551,90 @@ export default function InteractionCenterPage() {
                     暂无抢单记录
                   </div>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>任务</TableHead>
-                        <TableHead>抢单时间</TableHead>
-                        <TableHead>状态</TableHead>
-                        <TableHead>交付凭证</TableHead>
-                        <TableHead>收货信息</TableHead>
-                        <TableHead className="text-right">操作</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {myClaims.map((claim) => {
-                        const task = taskMap.get(claim.task_id);
-                        return (
-                          <TableRow key={claim.id}>
-                            <TableCell className="text-sm">
-                              {task ? task.title : claim.task_id}
-                            </TableCell>
-                          <TableCell className="text-sm">
-                            {new Date(claim.created_at).toLocaleString()}
-                          </TableCell>
-                          <TableCell>
-                            {claim.status === 'claimed' && (
-                              <Badge variant="secondary" className="bg-yellow-500/10 text-yellow-500">
-                                已抢单，待提交
-                              </Badge>
-                            )}
-                            {claim.status === 'submitted' && (
-                              <Badge variant="secondary" className="bg-blue-500/10 text-blue-500">
-                                已提交，待审核
-                              </Badge>
-                            )}
-                            {claim.status === 'approved' && (
-                              <Badge variant="secondary" className="bg-green-500/10 text-green-500">
-                                已通过
-                              </Badge>
-                            )}
-                            {claim.status === 'rejected' && (
-                              <Badge variant="secondary" className="bg-red-500/10 text-red-500">
-                                已拒绝
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-sm max-w-xs break-words">
-                            {claim.proof_url ? (
-                              <a
-                                href={claim.proof_url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-primary underline"
-                              >
-                                查看链接
-                              </a>
-                            ) : (
-                              '-'
-                            )}
-                            {claim.proof_notes && (
-                              <div className="mt-1 text-xs text-muted-foreground">
-                                {claim.proof_notes}
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-sm max-w-xs break-words">
-                            {claim.receive_username || claim.receive_address ? (
-                              <>
-                                <div>用户名：{claim.receive_username || '-'}</div>
-                                <div>收货地址：{claim.receive_address || '-'}</div>
-                              </>
-                            ) : (
-                              '-'
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {claim.status === 'claimed' && (
-                              <Button size="sm" onClick={() => openProofDialog(claim)}>
-                                提交交付信息
-                              </Button>
-                            )}
-                          </TableCell>
+                  <div className="rounded-md border overflow-x-auto">
+                    <Table className="min-w-[960px]">
+                      <TableHeader>
+                        <TableRow className="align-top">
+                          <TableHead>任务</TableHead>
+                          <TableHead>抢单时间</TableHead>
+                          <TableHead>状态</TableHead>
+                          <TableHead>交付凭证</TableHead>
+                          <TableHead>收货信息</TableHead>
+                          <TableHead className="text-right">操作</TableHead>
                         </TableRow>
-                      );
-                      })}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {myClaims.map((claim) => (
+                          <TableRow key={claim.id} className="align-top">
+                            <TableCell className="text-base font-semibold max-w-xs whitespace-normal break-words leading-relaxed">
+                              {getTaskTitle(claim.task_id)}
+                            </TableCell>
+                            <TableCell className="text-sm whitespace-nowrap leading-relaxed">
+                              {new Date(claim.created_at).toLocaleString()}
+                            </TableCell>
+                            <TableCell className="align-top">
+                              {claim.status === 'claimed' && (
+                                <Badge variant="secondary" className="bg-yellow-500/10 text-yellow-500">
+                                  已抢单，待提交
+                                </Badge>
+                              )}
+                              {claim.status === 'submitted' && (
+                                <Badge variant="secondary" className="bg-blue-500/10 text-blue-500">
+                                  已提交，待审核
+                                </Badge>
+                              )}
+                              {claim.status === 'approved' && (
+                                <Badge variant="secondary" className="bg-green-500/10 text-green-500">
+                                  已通过
+                                </Badge>
+                              )}
+                              {claim.status === 'rejected' && (
+                                <Badge variant="secondary" className="bg-red-500/10 text-red-500">
+                                  已拒绝
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-sm max-w-md break-words leading-relaxed">
+                              {claim.proof_url ? (
+                                <a
+                                  href={claim.proof_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-primary underline"
+                                >
+                                  查看链接
+                                </a>
+                              ) : (
+                                '-'
+                              )}
+                              {claim.proof_notes && (
+                                <div className="mt-1 text-xs text-muted-foreground whitespace-pre-wrap break-words leading-relaxed">
+                                  {claim.proof_notes}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-sm max-w-md break-all space-y-1 leading-relaxed">
+                              {claim.receive_username || claim.receive_address ? (
+                                <>
+                                  <div>用户名：{claim.receive_username || '-'}</div>
+                                  <div>收货地址：{claim.receive_address || '-'}</div>
+                                </>
+                              ) : (
+                                '-'
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right whitespace-nowrap">
+                              {claim.status === 'claimed' && (
+                                <Button size="sm" onClick={() => openProofDialog(claim)}>
+                                  提交交付信息
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -610,7 +650,7 @@ export default function InteractionCenterPage() {
           }
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-w-xl sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>提交交付信息</DialogTitle>
             <DialogDescription>
@@ -620,7 +660,7 @@ export default function InteractionCenterPage() {
           {selectedClaim && (
             <div className="space-y-4">
               <div className="space-y-1 text-sm text-muted-foreground">
-                <div>任务ID：{selectedClaim.task_id}</div>
+                <div>任务名称：{getTaskTitle(selectedClaim.task_id)}</div>
                 <div>抢单时间：{new Date(selectedClaim.created_at).toLocaleString()}</div>
               </div>
               <div className="space-y-2">
