@@ -174,6 +174,12 @@ export interface TaskOrder {
   deadline_at?: string | null;
   total_claims?: number | null;
   approved_claims?: number | null;
+  is_game_task?: boolean | null;
+  game_difficulty?: 'low' | 'medium' | 'high' | null;
+  activation_min_usdt?: number | null;
+  activation_max_usdt?: number | null;
+  reward_min_usdt?: number | null;
+  reward_max_usdt?: number | null;
   status: TaskOrderStatus;
   created_by: string;
   created_at: string;

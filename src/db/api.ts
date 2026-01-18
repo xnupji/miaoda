@@ -865,10 +865,25 @@ export async function createTaskOrder(
   reward: number,
   maxClaims: number | null,
   imageUrl: string | null,
-  deadlineAt: string | null
+  deadlineAt: string | null,
+  options?: {
+    isGameTask?: boolean;
+    gameDifficulty?: 'low' | 'medium' | 'high';
+    activationMinUsdt?: number | null;
+    activationMaxUsdt?: number | null;
+    rewardMinUsdt?: number | null;
+    rewardMaxUsdt?: number | null;
+  }
 ): Promise<boolean> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return false;
+
+  const isGameTask = options?.isGameTask ?? false;
+  const gameDifficulty = options?.gameDifficulty ?? null;
+  const activationMinUsdt = options?.activationMinUsdt ?? null;
+  const activationMaxUsdt = options?.activationMaxUsdt ?? null;
+  const rewardMinUsdt = options?.rewardMinUsdt ?? null;
+  const rewardMaxUsdt = options?.rewardMaxUsdt ?? null;
 
   const { error } = await supabase
     .from('task_orders')
@@ -879,6 +894,12 @@ export async function createTaskOrder(
       max_claims: maxClaims,
       image_url: imageUrl,
       deadline_at: deadlineAt,
+      is_game_task: isGameTask,
+      game_difficulty: gameDifficulty,
+      activation_min_usdt: activationMinUsdt,
+      activation_max_usdt: activationMaxUsdt,
+      reward_min_usdt: rewardMinUsdt,
+      reward_max_usdt: rewardMaxUsdt,
       created_by: user.id,
     });
 

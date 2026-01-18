@@ -25,6 +25,24 @@ alter table public.task_orders
 alter table public.task_orders
   add column if not exists approved_claims int default 0;
 
+alter table public.task_orders
+  add column if not exists is_game_task boolean default false;
+
+alter table public.task_orders
+  add column if not exists game_difficulty text check (game_difficulty in ('low', 'medium', 'high'));
+
+alter table public.task_orders
+  add column if not exists activation_min_usdt numeric;
+
+alter table public.task_orders
+  add column if not exists activation_max_usdt numeric;
+
+alter table public.task_orders
+  add column if not exists reward_min_usdt numeric;
+
+alter table public.task_orders
+  add column if not exists reward_max_usdt numeric;
+
 alter table public.task_orders enable row level security;
 
 drop policy if exists "Anyone can view open task orders" on public.task_orders;

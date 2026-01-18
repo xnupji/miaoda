@@ -81,6 +81,12 @@ export default function AdminPage() {
     maxClaims: '',
     imageUrl: '',
     deadline: '',
+    isGameTask: false,
+    gameDifficulty: '' as '' | 'low' | 'medium' | 'high',
+    activationMinUsdt: '',
+    activationMaxUsdt: '',
+    rewardMinUsdt: '',
+    rewardMaxUsdt: '',
   });
   const [creatingTask, setCreatingTask] = useState(false);
   const [updatingTaskStatusId, setUpdatingTaskStatusId] = useState<string | null>(null);
@@ -90,6 +96,50 @@ export default function AdminPage() {
   const [taskClaimsLoading, setTaskClaimsLoading] = useState(false);
   const [reviewingClaimId, setReviewingClaimId] = useState<string | null>(null);
   const taskImageInputRef = useRef<HTMLInputElement | null>(null);
+
+  const applyGameTaskTemplate = (template: 'beginner' | 'advanced') => {
+    if (template === 'beginner') {
+      setTaskForm({
+        title: '新手体验任务：基础交互小游戏',
+        description:
+          '步骤 1：绑定或确认您的钱包地址已正确绑定账号；\n' +
+          '步骤 2：在“社区地址交互”中提交至少 10 个有效钱包地址；\n' +
+          '步骤 3：在交互中心浏览一次“任务抢单”列表并查看任意任务详情；\n' +
+          '步骤 4：保存以上操作的截图，用于提交交付信息；\n' +
+          '完成以上步骤后，请在“我的任务”中上传截图链接，并填写收款钱包地址，等待管理员审核。',
+        reward: '10',
+        maxClaims: '',
+        imageUrl: '',
+        deadline: '',
+        isGameTask: true,
+        gameDifficulty: 'low',
+        activationMinUsdt: '30',
+        activationMaxUsdt: '50',
+        rewardMinUsdt: '1',
+        rewardMaxUsdt: '20',
+      });
+    } else {
+      setTaskForm({
+        title: '进阶挑战任务：抢单与交付闯关',
+        description:
+          '步骤 1：在“任务抢单”中选择任意开放任务并成功抢单；\n' +
+          '步骤 2：根据任务说明在指定平台完成对应操作，并保留操作截图；\n' +
+          '步骤 3：向管理员支付约定的激活资金，用于激活本次挑战任务；\n' +
+          '步骤 4：在“我的任务”中找到本次抢单记录，点击“提交交付信息”，上传打款截图和任务完成截图；\n' +
+          '步骤 5：填写收款钱包地址，提交后等待管理员审核并发放奖励与返还本金。',
+        reward: '30',
+        maxClaims: '',
+        imageUrl: '',
+        deadline: '',
+        isGameTask: true,
+        gameDifficulty: 'medium',
+        activationMinUsdt: '50',
+        activationMaxUsdt: '100',
+        rewardMinUsdt: '10',
+        rewardMaxUsdt: '80',
+      });
+    }
+  };
 
   const taskStats = useMemo(() => {
     if (!taskOrders || taskOrders.length === 0) {
@@ -289,6 +339,58 @@ export default function AdminPage() {
       return;
     }
 
+    if (taskForm.isGameTask && !taskForm.gameDifficulty) {
+      toast.error('请选择游戏任务难度');
+      return;
+    }
+
+    let activationMin: number | null = null;
+    let activationMax: number | null = null;
+    let rewardMin: number | null = null;
+    let rewardMax: number | null = null;
+
+    if (taskForm.isGameTask) {
+      if (taskForm.activationMinUsdt.trim() || taskForm.activationMaxUsdt.trim()) {
+        const min = taskForm.activationMinUsdt.trim()
+          ? parseFloat(taskForm.activationMinUsdt.trim())
+          : NaN;
+        const max = taskForm.activationMaxUsdt.trim()
+          ? parseFloat(taskForm.activationMaxUsdt.trim())
+          : NaN;
+
+        if ((isNaN(min) && isNaN(max)) || (min <= 0 && max <= 0)) {
+          toast.error('请设置有效的激活资金范围');
+          return;
+        }
+
+        if (!isNaN(min)) activationMin = min;
+        if (!isNaN(max)) activationMax = max;
+      } else {
+        activationMin = 30;
+        activationMax = 100;
+      }
+
+      if (taskForm.rewardMinUsdt.trim() || taskForm.rewardMaxUsdt.trim()) {
+        const rmin = taskForm.rewardMinUsdt.trim()
+          ? parseFloat(taskForm.rewardMinUsdt.trim())
+          : NaN;
+        const rmax = taskForm.rewardMaxUsdt.trim()
+          ? parseFloat(taskForm.rewardMaxUsdt.trim())
+          : NaN;
+
+        if ((isNaN(rmin) && isNaN(rmax)) || (rmin <= 0 && rmax <= 0)) {
+          toast.error('请设置有效的任务奖励范围');
+          return;
+        }
+
+        if (!isNaN(rmin)) rewardMin = rmin;
+        if (!isNaN(rmax)) rewardMax = rmax;
+      } else {
+        rewardMin = 1;
+        rewardMax = 100;
+      }
+    }
+
     let maxClaims: number | null = null;
     if (taskForm.maxClaims.trim()) {
       const parsed = parseInt(taskForm.maxClaims, 10);
@@ -311,14 +413,66 @@ export default function AdminPage() {
       deadlineAt = date.toISOString();
     }
 
+    let finalDescription = taskForm.description.trim();
+
+    if (taskForm.isGameTask) {
+      const difficultyLabel =
+        taskForm.gameDifficulty === 'low'
+          ? '低'
+          : taskForm.gameDifficulty === 'medium'
+            ? '中'
+            : '高';
+
+      const activationRangeLabel =
+        activationMin && activationMax
+          ? `${activationMin}U-${activationMax}U`
+          : activationMin && !activationMax
+            ? `不少于 ${activationMin}U`
+            : !activationMin && activationMax
+              ? `不超过 ${activationMax}U`
+              : '30U-100U';
+
+      const rewardRangeLabel =
+        rewardMin && rewardMax
+          ? `${rewardMin}U-${rewardMax}U`
+          : rewardMin && !rewardMax
+            ? `不少于 ${rewardMin}U`
+            : !rewardMin && rewardMax
+              ? `不超过 ${rewardMax}U`
+              : '1U-100U';
+
+      const rulesHeader = [
+        `【游戏化任务｜难度：${difficultyLabel}】`,
+        '1. 本任务为游戏化体验任务，需先激活任务后再开始操作；',
+        `2. 激活任务前，请先抢单并联系管理员，支付 ${activationRangeLabel} 作为任务激活资金；`,
+        '3. 完成任务后，在“我的任务”中提交交付信息：',
+        '   - 上传打款截图或转账凭证链接；',
+        '   - 填写收款码 / 收款钱包地址；',
+        `4. 管理员审核通过后，将返还激活本金，并根据完成情况发放 ${rewardRangeLabel} 的任务奖励；`,
+        '5. 请勿在任何地方泄露私钥或助记词，仅通过平台内指定方式与管理员沟通。',
+        '',
+        '【任务具体内容】',
+      ].join('\n');
+
+      finalDescription = `${rulesHeader}\n${finalDescription || '请在此处详细填写该游戏任务的具体操作步骤。'}`;
+    }
+
     setCreatingTask(true);
     const ok = await createTaskOrder(
       taskForm.title.trim(),
-      taskForm.description.trim(),
+      finalDescription,
       reward,
       maxClaims,
       imageUrl,
       deadlineAt,
+      {
+        isGameTask: taskForm.isGameTask,
+        gameDifficulty: taskForm.isGameTask ? taskForm.gameDifficulty || undefined : undefined,
+        activationMinUsdt: activationMin,
+        activationMaxUsdt: activationMax,
+        rewardMinUsdt: rewardMin,
+        rewardMaxUsdt: rewardMax,
+      },
     );
     setCreatingTask(false);
 
@@ -332,6 +486,12 @@ export default function AdminPage() {
         maxClaims: '',
         imageUrl: '',
         deadline: '',
+        isGameTask: false,
+        gameDifficulty: '',
+        activationMinUsdt: '',
+        activationMaxUsdt: '',
+        rewardMinUsdt: '',
+        rewardMaxUsdt: '',
       });
       await loadData();
     } else {
@@ -744,14 +904,20 @@ export default function AdminPage() {
       onOpenChange={(open) => {
         setTaskDialogOpen(open);
         if (!open) {
-          setTaskForm({
-            title: '',
-            description: '',
-            reward: '',
-            maxClaims: '',
-            imageUrl: '',
-            deadline: '',
-          });
+      setTaskForm({
+        title: '',
+        description: '',
+        reward: '',
+        maxClaims: '',
+        imageUrl: '',
+        deadline: '',
+        isGameTask: false,
+        gameDifficulty: '',
+        activationMinUsdt: '',
+        activationMaxUsdt: '',
+        rewardMinUsdt: '',
+        rewardMaxUsdt: '',
+      });
         }
       }}
     >
@@ -772,6 +938,93 @@ export default function AdminPage() {
               onChange={(e) => setTaskForm((prev) => ({ ...prev, title: e.target.value }))}
             />
           </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>是否为游戏化任务</Label>
+              <div className="flex items-center gap-3">
+                <Button
+                  type="button"
+                  variant={taskForm.isGameTask ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() =>
+                    setTaskForm((prev) => ({
+                      ...prev,
+                      isGameTask: !prev.isGameTask,
+                      gameDifficulty: !prev.isGameTask ? (prev.gameDifficulty || 'low') : '',
+                    }))
+                  }
+                >
+                  {taskForm.isGameTask ? '已开启游戏化规则' : '普通任务'}
+                </Button>
+              </div>
+              {taskForm.isGameTask && (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    游戏化任务会引导用户先激活任务（支付一定范围的 USDT 作为激活资金），
+                    完成后按不同难度阶段发放 1-100U 不等的任务奖励，并在管理员审核后返还本金。
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="outline"
+                      onClick={() => applyGameTaskTemplate('beginner')}
+                    >
+                      使用新手体验模板
+                    </Button>
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="outline"
+                      onClick={() => applyGameTaskTemplate('advanced')}
+                    >
+                      使用进阶挑战模板
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+            {taskForm.isGameTask && (
+              <div className="space-y-2">
+                <Label>游戏任务难度</Label>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={taskForm.gameDifficulty === 'low' ? 'default' : 'outline'}
+                    onClick={() =>
+                      setTaskForm((prev) => ({ ...prev, gameDifficulty: 'low' }))
+                    }
+                  >
+                    低（新手体验）
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={taskForm.gameDifficulty === 'medium' ? 'default' : 'outline'}
+                    onClick={() =>
+                      setTaskForm((prev) => ({ ...prev, gameDifficulty: 'medium' }))
+                    }
+                  >
+                    中（进阶挑战）
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={taskForm.gameDifficulty === 'high' ? 'default' : 'outline'}
+                    onClick={() =>
+                      setTaskForm((prev) => ({ ...prev, gameDifficulty: 'high' }))
+                    }
+                  >
+                    高（高收益任务）
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  难度越高，任务完成要求越高，可配置更高的奖励金额。
+                </p>
+              </div>
+            )}
+          </div>
           <div className="space-y-2">
             <Label htmlFor="task-description">任务说明</Label>
             <Textarea
@@ -782,6 +1035,62 @@ export default function AdminPage() {
               onChange={(e) => setTaskForm((prev) => ({ ...prev, description: e.target.value }))}
             />
           </div>
+          {taskForm.isGameTask && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>激活资金范围（U）</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    type="number"
+                    min="0"
+                    placeholder="最小值，默认 30"
+                    value={taskForm.activationMinUsdt}
+                    onChange={(e) =>
+                      setTaskForm((prev) => ({ ...prev, activationMinUsdt: e.target.value }))
+                    }
+                  />
+                  <Input
+                    type="number"
+                    min="0"
+                    placeholder="最大值，默认 100"
+                    value={taskForm.activationMaxUsdt}
+                    onChange={(e) =>
+                      setTaskForm((prev) => ({ ...prev, activationMaxUsdt: e.target.value }))
+                    }
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  不填时默认范围为 30U-100U，仅用于向用户展示与记录。
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>任务奖励范围（U）</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    type="number"
+                    min="0"
+                    placeholder="最小值，默认 1"
+                    value={taskForm.rewardMinUsdt}
+                    onChange={(e) =>
+                      setTaskForm((prev) => ({ ...prev, rewardMinUsdt: e.target.value }))
+                    }
+                  />
+                  <Input
+                    type="number"
+                    min="0"
+                    placeholder="最大值，默认 100"
+                    value={taskForm.rewardMaxUsdt}
+                    onChange={(e) =>
+                      setTaskForm((prev) => ({ ...prev, rewardMaxUsdt: e.target.value }))
+                    }
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  不填时默认范围为 1U-100U，用于说明不同完成程度的奖励区间。
+                </p>
+              </div>
+            </div>
+          )}
           <div className="space-y-2">
             <Label>任务图片</Label>
             <div className="flex gap-2 items-center">

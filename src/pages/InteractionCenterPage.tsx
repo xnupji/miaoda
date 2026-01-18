@@ -31,6 +31,8 @@ export default function InteractionCenterPage() {
   const [myClaims, setMyClaims] = useState<TaskOrderClaim[]>([]);
   const [myClaimsLoading, setMyClaimsLoading] = useState(false);
   const [claimingTaskId, setClaimingTaskId] = useState<string | null>(null);
+  const [taskDetailDialogOpen, setTaskDetailDialogOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<TaskOrder | null>(null);
   const [proofDialogOpen, setProofDialogOpen] = useState(false);
   const [selectedClaim, setSelectedClaim] = useState<TaskOrderClaim | null>(null);
   const [proofForm, setProofForm] = useState({
@@ -50,6 +52,46 @@ export default function InteractionCenterPage() {
     }
     return map;
   }, [taskOrders]);
+
+  const selectedTaskStats = useMemo(() => {
+    if (!selectedTask) return null;
+    const maxClaims = selectedTask.max_claims ?? 0;
+    const approved = selectedTask.approved_claims ?? 0;
+    const progress = maxClaims > 0 ? Math.min(100, (approved / maxClaims) * 100) : 0;
+    const deadlineLabel = selectedTask.deadline_at
+      ? new Date(selectedTask.deadline_at).toLocaleString('zh-CN')
+      : '不限';
+    const isGameTask =
+      selectedTask.is_game_task === true ||
+      (!!selectedTask.description && selectedTask.description.startsWith('【游戏化任务｜'));
+    let gameDifficulty: '低' | '中' | '高' | null = null;
+    if (isGameTask) {
+      if (selectedTask.game_difficulty === 'high') gameDifficulty = '高';
+      else if (selectedTask.game_difficulty === 'medium') gameDifficulty = '中';
+      else if (selectedTask.game_difficulty === 'low') gameDifficulty = '低';
+      else if (selectedTask.description) {
+        if (selectedTask.description.includes('难度：高')) gameDifficulty = '高';
+        else if (selectedTask.description.includes('难度：中')) gameDifficulty = '中';
+        else if (selectedTask.description.includes('难度：低')) gameDifficulty = '低';
+      }
+    }
+    const activationMin = selectedTask.activation_min_usdt ?? null;
+    const activationMax = selectedTask.activation_max_usdt ?? null;
+    const rewardMin = selectedTask.reward_min_usdt ?? null;
+    const rewardMax = selectedTask.reward_max_usdt ?? null;
+    return {
+      maxClaims,
+      approved,
+      progress,
+      deadlineLabel,
+      isGameTask,
+      gameDifficulty,
+      activationMin,
+      activationMax,
+      rewardMin,
+      rewardMax,
+    };
+  }, [selectedTask]);
 
   // Fetch submissions on mount
   useEffect(() => {
@@ -146,6 +188,11 @@ export default function InteractionCenterPage() {
     } else {
       toast.error(res.error || '抢单失败，请稍后重试');
     }
+  };
+
+  const openTaskDetail = (task: TaskOrder) => {
+    setSelectedTask(task);
+    setTaskDetailDialogOpen(true);
   };
 
   const openProofDialog = (claim: TaskOrderClaim) => {
@@ -446,8 +493,17 @@ export default function InteractionCenterPage() {
                               </div>
                             )}
                             <div className="flex-1 space-y-2">
-                              <div className="text-base font-semibold leading-relaxed">
-                                {task.title}
+                              <div className="flex items-center gap-2">
+                                <div className="text-base font-semibold leading-relaxed">
+                                  {task.title}
+                                </div>
+                                {(task.is_game_task ||
+                                  (task.description &&
+                                    task.description.startsWith('【游戏化任务｜'))) && (
+                                  <Badge variant="secondary" className="bg-purple-500/10 text-purple-500 text-[10px] px-1.5 py-0.5">
+                                    游戏任务
+                                  </Badge>
+                                )}
                               </div>
                               <div className="text-xs text-muted-foreground uppercase tracking-wide">
                                 任务说明
@@ -513,20 +569,30 @@ export default function InteractionCenterPage() {
                             </div>
                           </div>
                           <div className="flex items-center justify-between pt-2 border-t border-border/60">
-                            <div className="text-xs text-muted-foreground">
-                              如已抢单，请在完成任务后及时在“我的任务”中提交交付信息。
+                            <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                              <div>先查看任务详情，确认需要完成的操作内容。</div>
+                              <div>如已抢单，请在完成任务后及时在“我的任务”中提交交付信息。</div>
                             </div>
-                            <Button
-                              size="sm"
-                              className="px-6"
-                              disabled={task.status !== 'open' || claimed || claimingTaskId === task.id}
-                              onClick={() => handleClaimTask(task.id)}
-                            >
-                              {claimingTaskId === task.id && (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              )}
-                              {claimed ? '已抢单' : '抢单'}
-                            </Button>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openTaskDetail(task)}
+                              >
+                                查看任务详情
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="px-6"
+                                disabled={task.status !== 'open' || claimed || claimingTaskId === task.id}
+                                onClick={() => handleClaimTask(task.id)}
+                              >
+                                {claimingTaskId === task.id && (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                )}
+                                {claimed ? '已抢单' : '抢单'}
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       );
@@ -641,6 +707,175 @@ export default function InteractionCenterPage() {
           </>
         )}
       </Tabs>
+      <Dialog
+        open={taskDetailDialogOpen}
+        onOpenChange={(open) => {
+          setTaskDetailDialogOpen(open);
+          if (!open) {
+            setSelectedTask(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-xl sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{selectedTask ? selectedTask.title : '任务详情'}</DialogTitle>
+            <DialogDescription>
+              请根据下方说明完成任务，并在截止时间前提交交付信息。
+            </DialogDescription>
+          </DialogHeader>
+          {selectedTask && selectedTaskStats && (
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide">
+                    任务说明
+                  </div>
+                  {selectedTaskStats.isGameTask && (
+                    <div className="inline-flex items-center gap-2">
+                      <Badge variant="secondary" className="bg-purple-500/10 text-purple-500">
+                        游戏化任务
+                      </Badge>
+                      {selectedTaskStats.gameDifficulty && (
+                        <Badge variant="outline" className="text-xs border-purple-500/40 text-purple-500">
+                          难度：{selectedTaskStats.gameDifficulty}
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div className="rounded-md bg-muted/40 p-3 text-sm leading-relaxed whitespace-pre-wrap break-words">
+                  {selectedTask.description || '暂无任务说明，请联系管理员确认任务要求。'}
+                </div>
+              </div>
+              {selectedTaskStats.isGameTask && (
+                <div className="space-y-2 rounded-md border border-purple-200/60 bg-purple-50/60 p-3 text-xs sm:text-sm text-purple-900">
+                  <div className="font-semibold">游戏任务特别说明</div>
+                  <ul className="list-disc list-inside space-y-1 leading-relaxed">
+                    <li>本任务为游戏化体验任务，分为低 / 中 / 高三个难度阶段。</li>
+                    <li>开始前请先抢单，并按照页面提示联系管理员激活任务。</li>
+                    <li>
+                      激活任务需向管理员支付{' '}
+                      {selectedTaskStats.activationMin && selectedTaskStats.activationMax
+                        ? `${selectedTaskStats.activationMin}U-${selectedTaskStats.activationMax}U`
+                        : selectedTaskStats.activationMin && !selectedTaskStats.activationMax
+                          ? `不少于 ${selectedTaskStats.activationMin}U`
+                          : !selectedTaskStats.activationMin && selectedTaskStats.activationMax
+                            ? `不超过 ${selectedTaskStats.activationMax}U`
+                            : '约 30U-100U'}
+                      {' '}作为激活资金，请以管理员给出的收款方式为准。
+                    </li>
+                    <li>完成任务后，在“我的任务”中上传打款截图或转账凭证，并填写收款码 / 钱包地址。</li>
+                    <li>
+                      管理员审核通过后，将返还激活本金，并根据完成进度发放{' '}
+                      {selectedTaskStats.rewardMin && selectedTaskStats.rewardMax
+                        ? `${selectedTaskStats.rewardMin}U-${selectedTaskStats.rewardMax}U`
+                        : selectedTaskStats.rewardMin && !selectedTaskStats.rewardMax
+                          ? `不少于 ${selectedTaskStats.rewardMin}U`
+                          : !selectedTaskStats.rewardMin && selectedTaskStats.rewardMax
+                            ? `不超过 ${selectedTaskStats.rewardMax}U`
+                            : '1U-100U'}
+                      {' '}的任务奖励。
+                    </li>
+                    <li>请谨慎保管私钥和助记词，不要在任何聊天或网站中泄露。</li>
+                  </ul>
+                </div>
+              )}
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-1 rounded-md bg-background/80 p-3">
+                  <div className="text-xs text-muted-foreground">奖励金额</div>
+                  <div className="text-lg font-semibold">
+                    ${selectedTask.reward.toFixed(2)}
+                  </div>
+                </div>
+                <div className="space-y-1 rounded-md bg-background/80 p-3">
+                  <div className="text-xs text-muted-foreground">截止日期</div>
+                  <div className="text-sm">
+                    {selectedTaskStats.deadlineLabel}
+                  </div>
+                </div>
+                <div className="space-y-1 rounded-md bg-background/80 p-3">
+                  <div className="text-xs text-muted-foreground">当前状态</div>
+                  <div className="text-sm">
+                    {selectedTask.status === 'open' ? (
+                      <span className="text-green-500">可抢</span>
+                    ) : (
+                      <span className="text-gray-500">已关闭</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>完成进度</span>
+                  {selectedTaskStats.maxClaims > 0 && (
+                    <span>{selectedTaskStats.progress.toFixed(0)}%</span>
+                  )}
+                </div>
+                <div>
+                  {selectedTaskStats.maxClaims > 0 ? (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>已完成 {selectedTaskStats.approved} / {selectedTaskStats.maxClaims}</span>
+                      </div>
+                      <div className="h-2 w-full rounded-full bg-primary/10 overflow-hidden">
+                        <div
+                          className="h-full bg-primary"
+                          style={{ width: `${selectedTaskStats.progress}%` }}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">
+                      已完成 {selectedTaskStats.approved} 人（不限人数）
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide">
+                  操作指南
+                </div>
+                <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground leading-relaxed">
+                  <li>仔细阅读上方任务说明，确认需要完成的具体操作。</li>
+                  <li>根据说明在指定平台完成任务，例如发布内容、关注账号或填写表单。</li>
+                  <li>完成后前往“我的任务”，选择对应任务，点击“提交交付信息”。</li>
+                  <li>上传任务完成的截图链接或相关证明，并填写接收奖励的钱包地址。</li>
+                  <li>提交后耐心等待管理员审核，审核通过后奖励将发放至绑定钱包。</li>
+                </ol>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setTaskDetailDialogOpen(false);
+                    setSelectedTask(null);
+                  }}
+                >
+                  关闭
+                </Button>
+                <Button
+                  disabled={
+                    !selectedTask ||
+                    selectedTask.status !== 'open' ||
+                    myClaims.some((c) => c.task_id === selectedTask.id) ||
+                    claimingTaskId === selectedTask.id
+                  }
+                  onClick={() => {
+                    if (selectedTask) {
+                      handleClaimTask(selectedTask.id);
+                    }
+                  }}
+                >
+                  {claimingTaskId === selectedTask?.id && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  {selectedTask && myClaims.some((c) => c.task_id === selectedTask.id) ? '已抢单' : '立即抢单'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
       <Dialog
         open={proofDialogOpen}
         onOpenChange={(open) => {
