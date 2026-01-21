@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
@@ -2061,17 +2062,36 @@ export default function AdminPage() {
                             <TableCell>${task.reward.toFixed(2)}</TableCell>
                             <TableCell className="min-w-[200px]">
                               {maxClaims > 0 ? (
-                                <div className="space-y-1">
+                                <div className="space-y-2">
                                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                                     <span>已完成 {totalFilled} / {maxClaims}</span>
                                     <span>{progress.toFixed(0)}%</span>
                                   </div>
-                                  <div className="h-2 w-full rounded-full bg-primary/10 overflow-hidden">
-                                    <div
-                                      className="h-full bg-primary"
-                                      style={{ width: `${progress}%` }}
-                                    />
-                                  </div>
+                                  <Slider
+                                    value={[totalFilled]}
+                                    max={maxClaims}
+                                    min={approved}
+                                    step={1}
+                                    onValueChange={(vals) => {
+                                      const newTotal = vals[0];
+                                      const newManual = Math.max(0, newTotal - approved);
+                                      setTaskOrders(prev => prev.map(t => 
+                                        t.id === task.id ? { ...t, manual_filled_count: newManual } : t
+                                      ));
+                                    }}
+                                    onValueCommit={(vals) => {
+                                      const newTotal = vals[0];
+                                      const newManual = Math.max(0, newTotal - approved);
+                                      updateTaskOrder(task.id, { manual_filled_count: newManual })
+                                        .then(success => {
+                                          if (success) {
+                                            toast.success('进度已更新');
+                                          } else {
+                                            toast.error('更新失败');
+                                          }
+                                        });
+                                    }}
+                                  />
                                 </div>
                               ) : (
                                 <span className="text-xs text-muted-foreground">
