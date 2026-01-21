@@ -868,6 +868,7 @@ export async function createTaskOrder(
   deadlineAt: string | null,
   options?: {
     isGameTask?: boolean;
+    gameLink?: string | null;
     gameDifficulty?: 'low' | 'medium' | 'high';
     activationMinUsdt?: number | null;
     activationMaxUsdt?: number | null;
@@ -880,6 +881,7 @@ export async function createTaskOrder(
   if (!user) return false;
 
   const isGameTask = options?.isGameTask ?? false;
+  const gameLink = options?.gameLink ?? null;
   const gameDifficulty = options?.gameDifficulty ?? null;
   const activationMinUsdt = options?.activationMinUsdt ?? null;
   const activationMaxUsdt = options?.activationMaxUsdt ?? null;
@@ -897,6 +899,7 @@ export async function createTaskOrder(
       image_url: imageUrl,
       deadline_at: deadlineAt,
       is_game_task: isGameTask,
+      game_link: gameLink,
       game_difficulty: gameDifficulty,
       activation_min_usdt: activationMinUsdt,
       activation_max_usdt: activationMaxUsdt,
@@ -948,28 +951,28 @@ export async function updateTaskOrderStatus(
   return true;
 }
 
-export async function updateTaskOrder(
-  id: string,
-  updates: Partial<TaskOrder>
-): Promise<boolean> {
-  // Convert camelCase to snake_case for DB if needed, but here we assume Partial<TaskOrder> keys match DB or we map them.
-  // Actually TaskOrder keys are mixed camelCase in frontend vs snake_case in DB?
-  // No, TaskOrder in types.ts has snake_case keys for DB fields mostly?
-  // Let's check types.ts again.
-  // types.ts:
-  // activation_min_usdt?: number | null;
-  // So they are snake_case. Good.
-  
+export async function updateTaskOrder(id: string, updates: Partial<TaskOrder>): Promise<boolean> {
   const { error } = await supabase
     .from('task_orders')
-    .update({
-      ...updates,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updates)
     .eq('id', id);
 
   if (error) {
-    console.error('更新抢单任务失败:', error);
+    console.error('更新任务失败:', error);
+    return false;
+  }
+
+  return true;
+}
+
+export async function deleteTaskOrder(id: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('task_orders')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('删除任务失败:', error);
     return false;
   }
 

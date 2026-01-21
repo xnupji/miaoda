@@ -175,6 +175,7 @@ export interface TaskOrder {
   total_claims?: number | null;
   approved_claims?: number | null;
   is_game_task?: boolean | null;
+  game_link?: string | null;
   game_difficulty?: 'low' | 'medium' | 'high' | null;
   activation_min_usdt?: number | null;
   activation_max_usdt?: number | null;

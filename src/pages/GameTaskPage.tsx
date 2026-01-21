@@ -56,12 +56,14 @@ export default function GameTaskPage() {
     const activationMax = task.activation_max_usdt ?? null;
     const rewardMin = task.reward_min_usdt ?? null;
     const rewardMax = task.reward_max_usdt ?? null;
+    const gameLink = task.game_link || null;
     const deadlineLabel = task.deadline_at
       ? new Date(task.deadline_at).toLocaleString('zh-CN')
       : '不限';
     return {
       isGameTask,
       gameDifficulty,
+      gameLink,
       activationMin,
       activationMax,
       rewardMin,
@@ -211,6 +213,16 @@ export default function GameTaskPage() {
                 按照任务具体要求，在指定平台完成对应的游戏、交互或链上操作，
                 并记录好相关截图或链接，确保能够证明任务完成情况。
               </p>
+              {stats.gameLink && (
+                <div className="mt-4">
+                  <Button
+                    className="w-full sm:w-auto"
+                    onClick={() => window.open(stats.gameLink!, '_blank')}
+                  >
+                    前往体验游戏 / 交互
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
 

@@ -14,6 +14,7 @@ import {
   createAnnouncement,
   createTaskOrder,
   deleteAnnouncement,
+  deleteTaskOrder,
   getAllInteractionSubmissions,
   getAllMasterNodeApplications,
   getAllProfiles,
@@ -83,6 +84,7 @@ export default function AdminPage() {
     imageUrl: '',
     deadline: '',
     isGameTask: false,
+    gameLink: '',
     gameDifficulty: '' as '' | 'low' | 'medium' | 'high',
     activationMinUsdt: '',
     activationMaxUsdt: '',
@@ -98,6 +100,9 @@ export default function AdminPage() {
   const [taskClaims, setTaskClaims] = useState<TaskOrderClaim[]>([]);
   const [taskClaimsLoading, setTaskClaimsLoading] = useState(false);
   const [reviewingClaimId, setReviewingClaimId] = useState<string | null>(null);
+  const [taskToDelete, setTaskToDelete] = useState<TaskOrder | null>(null);
+  const [deleteTaskDialogOpen, setDeleteTaskDialogOpen] = useState(false);
+  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
   const taskImageInputRef = useRef<HTMLInputElement | null>(null);
 
   const applyGameTaskTemplate = (template: 'beginner' | 'advanced') => {
@@ -468,13 +473,18 @@ export default function AdminPage() {
       ].join('\n');
 
       if (!editingTaskId) {
-        finalDescription = `${rulesHeader}\n${finalDescription || '请在此处详细填写该游戏任务的具体操作步骤。'}`;
+        // Check if description already starts with header to avoid duplication if user edited it manually
+        if (!finalDescription.includes('【游戏化任务｜难度：')) {
+             finalDescription = `${rulesHeader}\n${finalDescription || '请在此处详细填写该游戏任务的具体操作步骤。'}`;
+        }
       }
     }
 
     setCreatingTask(true);
     let ok = false;
     
+    const gameLink = taskForm.gameLink.trim() || null;
+
     if (editingTaskId) {
       ok = await updateTaskOrder(editingTaskId, {
         title: taskForm.title.trim(),
@@ -484,6 +494,7 @@ export default function AdminPage() {
         image_url: imageUrl,
         deadline_at: deadlineAt,
         is_game_task: taskForm.isGameTask,
+        game_link: taskForm.isGameTask ? gameLink : null,
         game_difficulty: taskForm.isGameTask ? (taskForm.gameDifficulty || null) : null,
         activation_min_usdt: activationMin,
         activation_max_usdt: activationMax,
@@ -501,6 +512,7 @@ export default function AdminPage() {
         deadlineAt,
         {
           isGameTask: taskForm.isGameTask,
+          gameLink: taskForm.isGameTask ? gameLink : undefined,
           gameDifficulty: taskForm.isGameTask ? taskForm.gameDifficulty || undefined : undefined,
           activationMinUsdt: activationMin,
           activationMaxUsdt: activationMax,
@@ -525,6 +537,7 @@ export default function AdminPage() {
         imageUrl: '',
         deadline: '',
         isGameTask: false,
+        gameLink: '',
         gameDifficulty: '',
         activationMinUsdt: '',
         activationMaxUsdt: '',
@@ -548,6 +561,7 @@ export default function AdminPage() {
       imageUrl: task.image_url || '',
       deadline: task.deadline_at ? task.deadline_at.split('T')[0] : '',
       isGameTask: task.is_game_task || false,
+      gameLink: task.game_link || '',
       gameDifficulty: task.game_difficulty || '',
       activationMinUsdt: task.activation_min_usdt ? task.activation_min_usdt.toString() : '',
       activationMaxUsdt: task.activation_max_usdt ? task.activation_max_usdt.toString() : '',
@@ -568,6 +582,28 @@ export default function AdminPage() {
       await loadData();
     } else {
       toast.error('更新任务状态失败');
+    }
+  };
+
+  const confirmDeleteTask = (task: TaskOrder) => {
+    setTaskToDelete(task);
+    setDeleteTaskDialogOpen(true);
+  };
+
+  const handleDeleteTask = async () => {
+    if (!taskToDelete) return;
+
+    setDeletingTaskId(taskToDelete.id);
+    const success = await deleteTaskOrder(taskToDelete.id);
+    setDeletingTaskId(null);
+
+    if (success) {
+      toast.success('任务已删除');
+      setDeleteTaskDialogOpen(false);
+      setTaskToDelete(null);
+      await loadData();
+    } else {
+      toast.error('删除任务失败');
     }
   };
 
@@ -989,6 +1025,23 @@ export default function AdminPage() {
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
+          <Tabs
+            value={taskForm.isGameTask ? 'game' : 'normal'}
+            onValueChange={(v) =>
+              setTaskForm((prev) => ({
+                ...prev,
+                isGameTask: v === 'game',
+                gameDifficulty: v === 'game' ? (prev.gameDifficulty || 'low') : '',
+              }))
+            }
+            className="w-full"
+          >
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="normal">普通任务发布</TabsTrigger>
+              <TabsTrigger value="game">游戏化任务发布</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
           <div className="space-y-2">
             <Label htmlFor="task-title">任务标题</Label>
             <Input
@@ -998,26 +1051,40 @@ export default function AdminPage() {
               onChange={(e) => setTaskForm((prev) => ({ ...prev, title: e.target.value }))}
             />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+          {taskForm.isGameTask && (
             <div className="space-y-2">
-              <Label>是否为游戏化任务</Label>
-              <div className="flex items-center gap-3">
+              <Label htmlFor="task-game-link">游戏链接（提供给用户体验）</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="task-game-link"
+                  placeholder="请输入游戏链接，例如：https://example.com/game"
+                  value={taskForm.gameLink}
+                  onChange={(e) => setTaskForm((prev) => ({ ...prev, gameLink: e.target.value }))}
+                />
                 <Button
                   type="button"
-                  variant={taskForm.isGameTask ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() =>
-                    setTaskForm((prev) => ({
-                      ...prev,
-                      isGameTask: !prev.isGameTask,
-                      gameDifficulty: !prev.isGameTask ? (prev.gameDifficulty || 'low') : '',
-                    }))
-                  }
+                  variant="secondary"
+                  className="whitespace-nowrap"
+                  onClick={() => {
+                    // Use relative path which is safer for deployment
+                    setTaskForm(prev => ({ ...prev, gameLink: '/games/simple' }));
+                    toast.success('已填入内置游戏链接');
+                  }}
                 >
-                  {taskForm.isGameTask ? '已开启游戏化规则' : '普通任务'}
+                  填入内置游戏
                 </Button>
               </div>
-              {taskForm.isGameTask && (
+              <p className="text-xs text-muted-foreground">
+                用户在任务详情中点击"去体验"按钮时将跳转至此链接。内置游戏路径：<code className="bg-muted px-1 rounded">/games/simple</code>
+              </p>
+            </div>
+          )}
+
+          {taskForm.isGameTask && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>游戏任务配置</Label>
                 <div className="space-y-2">
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     游戏化任务会引导用户先激活任务（支付一定范围的 USDT 作为激活资金），
@@ -1042,9 +1109,7 @@ export default function AdminPage() {
                     </Button>
                   </div>
                 </div>
-              )}
-            </div>
-            {taskForm.isGameTask && (
+              </div>
               <div className="space-y-2">
                 <Label>游戏任务难度</Label>
                 <div className="flex flex-wrap gap-2">
@@ -1083,13 +1148,18 @@ export default function AdminPage() {
                   难度越高，任务完成要求越高，可配置更高的奖励金额。
                 </p>
               </div>
-            )}
-          </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="task-description">任务说明</Label>
             <Textarea
               id="task-description"
-              placeholder="请输入任务具体要求、步骤等"
+              placeholder={
+                taskForm.isGameTask
+                  ? "请输入游戏任务具体操作步骤..."
+                  : "请输入普通任务的具体要求和步骤..."
+              }
               className="min-h-[120px]"
               value={taskForm.description}
               onChange={(e) => setTaskForm((prev) => ({ ...prev, description: e.target.value }))}
@@ -1231,6 +1301,36 @@ export default function AdminPage() {
         </div>
       </DialogContent>
     </Dialog>
+
+    <Dialog open={deleteTaskDialogOpen} onOpenChange={setDeleteTaskDialogOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>确认删除任务</DialogTitle>
+          <DialogDescription>
+            此操作不可撤销，删除后相关的抢单记录也将无法查看。
+            <br />
+            确认要删除任务 "{taskToDelete?.title}" 吗？
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex gap-2 justify-end mt-4">
+          <Button
+            variant="outline"
+            onClick={() => setDeleteTaskDialogOpen(false)}
+          >
+            取消
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={handleDeleteTask}
+            disabled={!!deletingTaskId}
+          >
+            {deletingTaskId && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            确认删除
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
     <input
       ref={taskImageInputRef}
       type="file"
@@ -2015,6 +2115,18 @@ export default function AdminPage() {
                                 )}
                                 {task.status === 'open' ? '关闭任务' : '重新开放'}
                               </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                disabled={deletingTaskId === task.id}
+                                onClick={() => confirmDeleteTask(task)}
+                              >
+                                {deletingTaskId === task.id ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-4 h-4" />
+                                )}
+                              </Button>
                             </TableCell>
                           </TableRow>
                         );
@@ -2435,6 +2547,37 @@ export default function AdminPage() {
             <Button onClick={submitAnnouncement} disabled={submittingAnnouncement}>
               {submittingAnnouncement && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {announcementDialog.mode === 'create' ? '发布' : '保存'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* 任务删除确认对话框 */}
+      <Dialog open={deleteTaskDialogOpen} onOpenChange={setDeleteTaskDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>确认删除任务</DialogTitle>
+            <DialogDescription>
+              此操作无法撤销。删除后，相关的抢单记录和统计数据可能也会受到影响。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p>确定要删除任务 <span className="font-bold">{taskToDelete?.title}</span> 吗？</p>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteTaskDialogOpen(false)}
+            >
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteTask}
+              disabled={!!deletingTaskId}
+            >
+              {deletingTaskId && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              确认删除
             </Button>
           </div>
         </DialogContent>

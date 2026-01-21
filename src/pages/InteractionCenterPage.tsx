@@ -99,6 +99,7 @@ export default function InteractionCenterPage() {
     const activationMax = selectedTask.activation_max_usdt ?? null;
     const rewardMin = selectedTask.reward_min_usdt ?? null;
     const rewardMax = selectedTask.reward_max_usdt ?? null;
+    const gameLink = selectedTask.game_link || null;
     return {
       maxClaims,
       approved,
@@ -107,6 +108,7 @@ export default function InteractionCenterPage() {
       deadlineLabel,
       isGameTask,
       gameDifficulty,
+      gameLink,
       activationMin,
       activationMax,
       rewardMin,
@@ -877,7 +879,19 @@ export default function InteractionCenterPage() {
               </div>
               {selectedTaskStats.isGameTask && (
                 <div className="space-y-2 rounded-md border border-purple-200/60 bg-purple-50/60 p-3 text-xs sm:text-sm text-purple-900">
-                  <div className="font-semibold">游戏任务特别说明</div>
+                  <div className="font-semibold flex items-center justify-between">
+                    <span>游戏任务特别说明</span>
+                    {selectedTaskStats.gameLink && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="h-6 text-xs bg-purple-200 text-purple-900 hover:bg-purple-300"
+                        onClick={() => window.open(selectedTaskStats.gameLink!, '_blank')}
+                      >
+                        去体验
+                      </Button>
+                    )}
+                  </div>
                   <ul className="list-disc list-inside space-y-1 leading-relaxed">
                     <li>本任务为游戏化体验任务，分为低 / 中 / 高三个难度阶段。</li>
                     <li>开始前请先抢单，并按照页面提示联系管理员激活任务。</li>

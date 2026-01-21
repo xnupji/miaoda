@@ -16,6 +16,7 @@ const CustomerServicePage = lazy(() => import('./pages/CustomerServicePage'));
 const SearchPage = lazy(() => import('./pages/SearchPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const GameTaskPage = lazy(() => import('./pages/GameTaskPage'));
+const SimpleGamePage = lazy(() => import('./pages/SimpleGamePage'));
 
 interface RouteConfig {
   name: string;
@@ -91,6 +92,12 @@ const routes: RouteConfig[] = [
     name: '游戏任务',
     path: '/game/:claimId',
     element: <GameTaskPage />,
+    visible: false,
+  },
+  {
+    name: '游戏体验',
+    path: '/games/simple',
+    element: <SimpleGamePage />,
     visible: false,
   },
 ];
