@@ -180,6 +180,7 @@ export interface TaskOrder {
   activation_max_usdt?: number | null;
   reward_min_usdt?: number | null;
   reward_max_usdt?: number | null;
+  manual_filled_count?: number | null;
   status: TaskOrderStatus;
   created_by: string;
   created_at: string;

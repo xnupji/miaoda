@@ -15,6 +15,7 @@ const InteractionCenterPage = lazy(() => import('./pages/InteractionCenterPage')
 const CustomerServicePage = lazy(() => import('./pages/CustomerServicePage'));
 const SearchPage = lazy(() => import('./pages/SearchPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
+const GameTaskPage = lazy(() => import('./pages/GameTaskPage'));
 
 interface RouteConfig {
   name: string;
@@ -84,6 +85,12 @@ const routes: RouteConfig[] = [
     name: '登录',
     path: '/login',
     element: <LoginPage />,
+    visible: false,
+  },
+  {
+    name: '游戏任务',
+    path: '/game/:claimId',
+    element: <GameTaskPage />,
     visible: false,
   },
 ];

@@ -31,6 +31,7 @@ import {
   updateAnnouncement,
   updateInteractionSubmissionStatus,
   updateSystemSetting,
+  updateTaskOrder,
   updateTaskOrderStatus,
   updateUserRole,
 } from '@/db/api';
@@ -87,8 +88,10 @@ export default function AdminPage() {
     activationMaxUsdt: '',
     rewardMinUsdt: '',
     rewardMaxUsdt: '',
+    manualFilledCount: '',
   });
   const [creatingTask, setCreatingTask] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [updatingTaskStatusId, setUpdatingTaskStatusId] = useState<string | null>(null);
   const [taskClaimsDialogOpen, setTaskClaimsDialogOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<TaskOrder | null>(null);
@@ -413,6 +416,16 @@ export default function AdminPage() {
       deadlineAt = date.toISOString();
     }
 
+    let manualFilledCount: number | null = null;
+    if (taskForm.manualFilledCount.trim()) {
+      const parsed = parseInt(taskForm.manualFilledCount, 10);
+      if (isNaN(parsed) || parsed < 0) {
+        toast.error('后台填单数必须为非负整数');
+        return;
+      }
+      manualFilledCount = parsed;
+    }
+
     let finalDescription = taskForm.description.trim();
 
     if (taskForm.isGameTask) {
@@ -454,31 +467,56 @@ export default function AdminPage() {
         '【任务具体内容】',
       ].join('\n');
 
-      finalDescription = `${rulesHeader}\n${finalDescription || '请在此处详细填写该游戏任务的具体操作步骤。'}`;
+      if (!editingTaskId) {
+        finalDescription = `${rulesHeader}\n${finalDescription || '请在此处详细填写该游戏任务的具体操作步骤。'}`;
+      }
     }
 
     setCreatingTask(true);
-    const ok = await createTaskOrder(
-      taskForm.title.trim(),
-      finalDescription,
-      reward,
-      maxClaims,
-      imageUrl,
-      deadlineAt,
-      {
-        isGameTask: taskForm.isGameTask,
-        gameDifficulty: taskForm.isGameTask ? taskForm.gameDifficulty || undefined : undefined,
-        activationMinUsdt: activationMin,
-        activationMaxUsdt: activationMax,
-        rewardMinUsdt: rewardMin,
-        rewardMaxUsdt: rewardMax,
-      },
-    );
+    let ok = false;
+    
+    if (editingTaskId) {
+      ok = await updateTaskOrder(editingTaskId, {
+        title: taskForm.title.trim(),
+        description: finalDescription,
+        reward: reward,
+        max_claims: maxClaims,
+        image_url: imageUrl,
+        deadline_at: deadlineAt,
+        is_game_task: taskForm.isGameTask,
+        game_difficulty: taskForm.isGameTask ? (taskForm.gameDifficulty || null) : null,
+        activation_min_usdt: activationMin,
+        activation_max_usdt: activationMax,
+        reward_min_usdt: rewardMin,
+        reward_max_usdt: rewardMax,
+        manual_filled_count: manualFilledCount,
+      });
+    } else {
+      ok = await createTaskOrder(
+        taskForm.title.trim(),
+        finalDescription,
+        reward,
+        maxClaims,
+        imageUrl,
+        deadlineAt,
+        {
+          isGameTask: taskForm.isGameTask,
+          gameDifficulty: taskForm.isGameTask ? taskForm.gameDifficulty || undefined : undefined,
+          activationMinUsdt: activationMin,
+          activationMaxUsdt: activationMax,
+          rewardMinUsdt: rewardMin,
+          rewardMaxUsdt: rewardMax,
+          manualFilledCount: manualFilledCount,
+        },
+      );
+    }
+    
     setCreatingTask(false);
 
     if (ok) {
-      toast.success('抢单任务创建成功');
+      toast.success(editingTaskId ? '抢单任务更新成功' : '抢单任务创建成功');
       setTaskDialogOpen(false);
+      setEditingTaskId(null);
       setTaskForm({
         title: '',
         description: '',
@@ -492,11 +530,32 @@ export default function AdminPage() {
         activationMaxUsdt: '',
         rewardMinUsdt: '',
         rewardMaxUsdt: '',
+        manualFilledCount: '',
       });
       await loadData();
     } else {
-      toast.error('创建抢单任务失败');
+      toast.error(editingTaskId ? '更新抢单任务失败' : '创建抢单任务失败');
     }
+  };
+
+  const handleEditTask = (task: TaskOrder) => {
+    setEditingTaskId(task.id);
+    setTaskForm({
+      title: task.title,
+      description: task.description || '',
+      reward: task.reward.toString(),
+      maxClaims: task.max_claims ? task.max_claims.toString() : '',
+      imageUrl: task.image_url || '',
+      deadline: task.deadline_at ? task.deadline_at.split('T')[0] : '',
+      isGameTask: task.is_game_task || false,
+      gameDifficulty: task.game_difficulty || '',
+      activationMinUsdt: task.activation_min_usdt ? task.activation_min_usdt.toString() : '',
+      activationMaxUsdt: task.activation_max_usdt ? task.activation_max_usdt.toString() : '',
+      rewardMinUsdt: task.reward_min_usdt ? task.reward_min_usdt.toString() : '',
+      rewardMaxUsdt: task.reward_max_usdt ? task.reward_max_usdt.toString() : '',
+      manualFilledCount: task.manual_filled_count ? task.manual_filled_count.toString() : '',
+    });
+    setTaskDialogOpen(true);
   };
 
   const handleToggleTaskStatus = async (task: TaskOrder) => {
@@ -917,6 +976,7 @@ export default function AdminPage() {
         activationMaxUsdt: '',
         rewardMinUsdt: '',
         rewardMaxUsdt: '',
+        manualFilledCount: '',
       });
         }
       }}
@@ -1109,7 +1169,7 @@ export default function AdminPage() {
               </Button>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="task-reward">奖励金额（USD）</Label>
               <Input
@@ -1140,6 +1200,17 @@ export default function AdminPage() {
                 type="date"
                 value={taskForm.deadline}
                 onChange={(e) => setTaskForm((prev) => ({ ...prev, deadline: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="task-manual-filled">后台填单数（进度条调整）</Label>
+              <Input
+                id="task-manual-filled"
+                type="number"
+                min="0"
+                placeholder="0"
+                value={taskForm.manualFilledCount}
+                onChange={(e) => setTaskForm((prev) => ({ ...prev, manualFilledCount: e.target.value }))}
               />
             </div>
           </div>
@@ -1877,7 +1948,9 @@ export default function AdminPage() {
                       {taskOrders.map((task) => {
                         const maxClaims = task.max_claims ?? 0;
                         const approved = task.approved_claims ?? 0;
-                        const progress = maxClaims > 0 ? Math.min(100, (approved / maxClaims) * 100) : 0;
+                        const manualFilled = task.manual_filled_count ?? 0;
+                        const totalFilled = approved + manualFilled;
+                        const progress = maxClaims > 0 ? Math.min(100, (totalFilled / maxClaims) * 100) : 0;
                         const deadlineLabel = task.deadline_at
                           ? new Date(task.deadline_at).toLocaleDateString('zh-CN')
                           : '不限';
@@ -1890,7 +1963,7 @@ export default function AdminPage() {
                               {maxClaims > 0 ? (
                                 <div className="space-y-1">
                                   <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                    <span>已完成 {approved} / {maxClaims}</span>
+                                    <span>已完成 {totalFilled} / {maxClaims}</span>
                                     <span>{progress.toFixed(0)}%</span>
                                   </div>
                                   <div className="h-2 w-full rounded-full bg-primary/10 overflow-hidden">
@@ -1902,7 +1975,7 @@ export default function AdminPage() {
                                 </div>
                               ) : (
                                 <span className="text-xs text-muted-foreground">
-                                  已完成 {approved} 人（不限人数）
+                                  已完成 {totalFilled} 人（不限人数）
                                 </span>
                               )}
                             </TableCell>
@@ -2058,7 +2131,7 @@ export default function AdminPage() {
                     className="font-mono"
                   />
                   <p className="text-xs text-muted-foreground">
-                    此地址用于接收用户支付的钱包激活费用（30 USDT）
+                    此地址用于接收用户支付的钱包激活费用以及游戏任务激活资金
                   </p>
                 </div>
 

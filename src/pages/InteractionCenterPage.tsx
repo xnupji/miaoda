@@ -1,5 +1,6 @@
 import { Loader2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,13 +14,24 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWeb3 } from '@/contexts/Web3Context';
 import { supabase } from '@/db/supabase';
-import { bindWalletAddress, claimTaskOrder, createInteractionSubmission, getMyTaskOrderClaims, getOpenTaskOrders, getUserInteractionSubmissions, submitTaskOrderProof } from '@/db/api';
+import { bindWalletAddress, claimTaskOrder, createInteractionSubmission, getMyTaskOrderClaims, getOpenTaskOrders, getPlatformConfig, getUserInteractionSubmissions, submitTaskOrderProof } from '@/db/api';
 import type { InteractionSubmission, TaskOrder, TaskOrderClaim } from '@/types/types';
 
 export default function InteractionCenterPage() {
   const { profile, refreshProfile } = useAuth();
   const { isConnected, account } = useWeb3();
-  const [activeTab, setActiveTab] = useState('community');
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'community' || tab === 'institution' || tab === 'tasks') {
+      return tab;
+    }
+    if (searchParams.get('claimId')) {
+      return 'tasks';
+    }
+    return 'community';
+  });
   const [communityAddresses, setCommunityAddresses] = useState('');
   const [institutionAddresses, setInstitutionAddresses] = useState('');
   const [submissions, setSubmissions] = useState<InteractionSubmission[]>([]);
@@ -33,6 +45,11 @@ export default function InteractionCenterPage() {
   const [claimingTaskId, setClaimingTaskId] = useState<string | null>(null);
   const [taskDetailDialogOpen, setTaskDetailDialogOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<TaskOrder | null>(null);
+  const [activationDialogOpen, setActivationDialogOpen] = useState(false);
+  const [activationTask, setActivationTask] = useState<TaskOrder | null>(null);
+  const [gameDialogOpen, setGameDialogOpen] = useState(false);
+  const [gameClaim, setGameClaim] = useState<TaskOrderClaim | null>(null);
+  const [gameStep, setGameStep] = useState(1);
   const [proofDialogOpen, setProofDialogOpen] = useState(false);
   const [selectedClaim, setSelectedClaim] = useState<TaskOrderClaim | null>(null);
   const [proofForm, setProofForm] = useState({
@@ -44,6 +61,7 @@ export default function InteractionCenterPage() {
   const [submittingProof, setSubmittingProof] = useState(false);
   const [uploadingProofImage, setUploadingProofImage] = useState(false);
   const proofFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [developerAddress, setDeveloperAddress] = useState('');
 
   const taskMap = useMemo(() => {
     const map = new Map<string, TaskOrder>();
@@ -57,7 +75,9 @@ export default function InteractionCenterPage() {
     if (!selectedTask) return null;
     const maxClaims = selectedTask.max_claims ?? 0;
     const approved = selectedTask.approved_claims ?? 0;
-    const progress = maxClaims > 0 ? Math.min(100, (approved / maxClaims) * 100) : 0;
+    const manualFilled = selectedTask.manual_filled_count ?? 0;
+    const filled = approved + manualFilled;
+    const progress = maxClaims > 0 ? Math.min(100, (filled / maxClaims) * 100) : 0;
     const deadlineLabel = selectedTask.deadline_at
       ? new Date(selectedTask.deadline_at).toLocaleString('zh-CN')
       : '不限';
@@ -82,6 +102,7 @@ export default function InteractionCenterPage() {
     return {
       maxClaims,
       approved,
+      filled,
       progress,
       deadlineLabel,
       isGameTask,
@@ -93,9 +114,45 @@ export default function InteractionCenterPage() {
     };
   }, [selectedTask]);
 
+  const activationTaskStats = useMemo(() => {
+    if (!activationTask) return null;
+    const isGameTask =
+      activationTask.is_game_task === true ||
+      (!!activationTask.description && activationTask.description.startsWith('【游戏化任务｜'));
+    if (!isGameTask) return null;
+    let gameDifficulty: '低' | '中' | '高' | null = null;
+    if (activationTask.game_difficulty === 'high') gameDifficulty = '高';
+    else if (activationTask.game_difficulty === 'medium') gameDifficulty = '中';
+    else if (activationTask.game_difficulty === 'low') gameDifficulty = '低';
+    else if (activationTask.description) {
+      if (activationTask.description.includes('难度：高')) gameDifficulty = '高';
+      else if (activationTask.description.includes('难度：中')) gameDifficulty = '中';
+      else if (activationTask.description.includes('难度：低')) gameDifficulty = '低';
+    }
+    const activationMin = activationTask.activation_min_usdt ?? null;
+    const activationMax = activationTask.activation_max_usdt ?? null;
+    const rewardMin = activationTask.reward_min_usdt ?? null;
+    const rewardMax = activationTask.reward_max_usdt ?? null;
+    return {
+      gameDifficulty,
+      activationMin,
+      activationMax,
+      rewardMin,
+      rewardMax,
+    };
+  }, [activationTask]);
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    const next = new URLSearchParams(searchParams.toString());
+    next.set('tab', tab);
+    setSearchParams(next);
+  };
+
   // Fetch submissions on mount
   useEffect(() => {
     loadSubmissions();
+    loadDeveloperAddress();
   }, []);
 
   useEffect(() => {
@@ -112,6 +169,13 @@ export default function InteractionCenterPage() {
     setLoading(false);
   }
 
+  async function loadDeveloperAddress() {
+    const address = await getPlatformConfig('developer_usdt_address');
+    if (address) {
+      setDeveloperAddress(address);
+    }
+  }
+
   async function loadTaskOrders() {
     setTaskOrdersLoading(true);
     const data = await getOpenTaskOrders();
@@ -125,6 +189,17 @@ export default function InteractionCenterPage() {
     setMyClaims(data);
     setMyClaimsLoading(false);
   }
+
+  useEffect(() => {
+    const claimId = searchParams.get('claimId');
+    if (!claimId || myClaims.length === 0 || proofDialogOpen) {
+      return;
+    }
+    const claim = myClaims.find((c) => c.id === claimId);
+    if (claim) {
+      openProofDialog(claim);
+    }
+  }, [searchParams, myClaims, proofDialogOpen]);
 
   const handleSubmit = async () => {
     if (!profile) {
@@ -178,13 +253,25 @@ export default function InteractionCenterPage() {
       toast.error('请先登录');
       return;
     }
+    const task = taskMap.get(taskId);
     setClaimingTaskId(taskId);
     const res = await claimTaskOrder(taskId);
     setClaimingTaskId(null);
     if (res.ok) {
-      toast.success('抢单成功，请按要求完成任务并提交交付信息');
       loadTaskOrders();
       loadMyClaims();
+      if (task) {
+        const isGameTask =
+          task.is_game_task === true ||
+          (!!task.description && task.description.startsWith('【游戏化任务｜'));
+        if (isGameTask) {
+          setActivationTask(task);
+          setActivationDialogOpen(true);
+          toast.success('抢单成功，已为您打开游戏任务激活流程');
+          return;
+        }
+      }
+      toast.success('抢单成功，请按要求完成任务并提交交付信息');
     } else {
       toast.error(res.error || '抢单失败，请稍后重试');
     }
@@ -204,6 +291,13 @@ export default function InteractionCenterPage() {
       receiveAddress: claim.receive_address || '',
     });
     setProofDialogOpen(true);
+  };
+
+  const openGameDialog = (claim: TaskOrderClaim) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', 'tasks');
+    params.set('claimId', claim.id);
+    navigate(`/game/${claim.id}?${params.toString()}`);
   };
 
   const handleChooseProofImage = () => {
@@ -276,6 +370,19 @@ export default function InteractionCenterPage() {
       loadMyClaims();
     } else {
       toast.error('提交失败，请稍后重试');
+    }
+  };
+
+  const handleCopyDeveloperAddress = async () => {
+    if (!developerAddress) {
+      toast.error('管理员尚未配置USDT收款地址，请先联系管理员确认后再打款');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(developerAddress);
+      toast.success('收款地址已复制到剪贴板');
+    } catch {
+      toast.error('复制失败，请手动复制');
     }
   };
 
@@ -353,7 +460,7 @@ export default function InteractionCenterPage() {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="community" onValueChange={setActiveTab} className="space-y-4">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
         <TabsList>
           <TabsTrigger value="community">社区地址交互</TabsTrigger>
           <TabsTrigger value="institution">机构交付中心</TabsTrigger>
@@ -472,7 +579,9 @@ export default function InteractionCenterPage() {
                       const claimed = myClaims.some((c) => c.task_id === task.id);
                       const maxClaims = task.max_claims ?? 0;
                       const approved = task.approved_claims ?? 0;
-                      const progress = maxClaims > 0 ? Math.min(100, (approved / maxClaims) * 100) : 0;
+                      const manualFilled = task.manual_filled_count ?? 0;
+                      const filled = approved + manualFilled;
+                      const progress = maxClaims > 0 ? Math.min(100, (filled / maxClaims) * 100) : 0;
                       const deadlineLabel = task.deadline_at
                         ? new Date(task.deadline_at).toLocaleDateString('zh-CN')
                         : '不限';
@@ -531,7 +640,7 @@ export default function InteractionCenterPage() {
                                 {maxClaims > 0 ? (
                                   <div className="space-y-1">
                                     <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                      <span>已完成 {approved} / {maxClaims}</span>
+                                      <span>已抢 {filled} / {maxClaims}</span>
                                     </div>
                                     <div className="h-2 w-full rounded-full bg-primary/10 overflow-hidden">
                                       <div
@@ -542,7 +651,7 @@ export default function InteractionCenterPage() {
                                   </div>
                                 ) : (
                                   <span className="text-xs text-muted-foreground">
-                                    已完成 {approved} 人（不限人数）
+                                    已抢 {filled} 人（不限人数）
                                   </span>
                                 )}
                               </div>
@@ -584,13 +693,13 @@ export default function InteractionCenterPage() {
                               <Button
                                 size="sm"
                                 className="px-6"
-                                disabled={task.status !== 'open' || claimed || claimingTaskId === task.id}
+                                disabled={task.status !== 'open' || claimed || claimingTaskId === task.id || (maxClaims > 0 && filled >= maxClaims)}
                                 onClick={() => handleClaimTask(task.id)}
                               >
                                 {claimingTaskId === task.id && (
                                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 )}
-                                {claimed ? '已抢单' : '抢单'}
+                                {claimed ? '已抢单' : (maxClaims > 0 && filled >= maxClaims) ? '已抢完' : '抢单'}
                               </Button>
                             </div>
                           </div>
@@ -602,7 +711,7 @@ export default function InteractionCenterPage() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card id="my-tasks-card">
               <CardHeader>
                 <CardTitle>我的任务</CardTitle>
                 <CardDescription>查看已抢任务，提交交付凭证和收货信息</CardDescription>
@@ -691,9 +800,28 @@ export default function InteractionCenterPage() {
                             </TableCell>
                             <TableCell className="text-right whitespace-nowrap">
                               {claim.status === 'claimed' && (
-                                <Button size="sm" onClick={() => openProofDialog(claim)}>
-                                  提交交付信息
-                                </Button>
+                                <div className="flex flex-col items-end gap-1">
+                                  {(() => {
+                                    const task = taskMap.get(claim.task_id);
+                                    const isGameTask =
+                                      !!task &&
+                                      (task.is_game_task === true ||
+                                        (!!task.description && task.description.startsWith('【游戏化任务｜')));
+                                    if (!isGameTask) return null;
+                                    return (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => openGameDialog(claim)}
+                                      >
+                                        开始闯关
+                                      </Button>
+                                    );
+                                  })()}
+                                  <Button size="sm" onClick={() => openProofDialog(claim)}>
+                                    提交交付信息
+                                  </Button>
+                                </div>
                               )}
                             </TableCell>
                           </TableRow>
@@ -815,7 +943,7 @@ export default function InteractionCenterPage() {
                   {selectedTaskStats.maxClaims > 0 ? (
                     <div className="space-y-1">
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>已完成 {selectedTaskStats.approved} / {selectedTaskStats.maxClaims}</span>
+                        <span>已完成 {selectedTaskStats.filled} / {selectedTaskStats.maxClaims}</span>
                       </div>
                       <div className="h-2 w-full rounded-full bg-primary/10 overflow-hidden">
                         <div
@@ -826,7 +954,7 @@ export default function InteractionCenterPage() {
                     </div>
                   ) : (
                     <span className="text-xs text-muted-foreground">
-                      已完成 {selectedTaskStats.approved} 人（不限人数）
+                      已完成 {selectedTaskStats.filled} 人（不限人数）
                     </span>
                   )}
                 </div>
@@ -858,7 +986,8 @@ export default function InteractionCenterPage() {
                     !selectedTask ||
                     selectedTask.status !== 'open' ||
                     myClaims.some((c) => c.task_id === selectedTask.id) ||
-                    claimingTaskId === selectedTask.id
+                    claimingTaskId === selectedTask.id ||
+                    (selectedTaskStats && selectedTaskStats.maxClaims > 0 && selectedTaskStats.filled >= selectedTaskStats.maxClaims)
                   }
                   onClick={() => {
                     if (selectedTask) {
@@ -869,7 +998,238 @@ export default function InteractionCenterPage() {
                   {claimingTaskId === selectedTask?.id && (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
-                  {selectedTask && myClaims.some((c) => c.task_id === selectedTask.id) ? '已抢单' : '立即抢单'}
+                  {myClaims.some((c) => c.task_id === selectedTask?.id) ? '已抢单' : (selectedTaskStats && selectedTaskStats.maxClaims > 0 && selectedTaskStats.filled >= selectedTaskStats.maxClaims) ? '已抢完' : '抢单'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={activationDialogOpen}
+        onOpenChange={(open) => {
+          setActivationDialogOpen(open);
+          if (!open) {
+            setActivationTask(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-xl sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>游戏任务激活与闯关流程</DialogTitle>
+            <DialogDescription>
+              您已成功抢到游戏化任务，请按步骤完成激活打款和闯关操作。
+            </DialogDescription>
+          </DialogHeader>
+          {activationTask && (
+            <div className="space-y-4 text-sm leading-relaxed">
+              <div className="space-y-1">
+                <div className="text-xs text-muted-foreground">当前任务</div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="font-semibold">{activationTask.title}</div>
+                  <Badge variant="secondary" className="bg-purple-500/10 text-purple-500 text-[10px] px-1.5 py-0.5">
+                    游戏任务
+                  </Badge>
+                  {activationTaskStats && activationTaskStats.gameDifficulty && (
+                    <Badge variant="outline" className="text-xs border-purple-500/40 text-purple-500">
+                      难度：{activationTaskStats.gameDifficulty}
+                    </Badge>
+                  )}
+                </div>
+                {activationTaskStats && (
+                  <div className="text-xs text-muted-foreground">
+                    激活资金参考：
+                    {activationTaskStats.activationMin && activationTaskStats.activationMax
+                      ? `${activationTaskStats.activationMin}U-${activationTaskStats.activationMax}U`
+                      : activationTaskStats.activationMin && !activationTaskStats.activationMax
+                        ? `不少于 ${activationTaskStats.activationMin}U`
+                        : !activationTaskStats.activationMin && activationTaskStats.activationMax
+                          ? `不超过 ${activationTaskStats.activationMax}U`
+                          : '约 30U-100U'}
+                    {' ｜ 奖励区间：'}
+                    {activationTaskStats.rewardMin && activationTaskStats.rewardMax
+                      ? `${activationTaskStats.rewardMin}U-${activationTaskStats.rewardMax}U`
+                      : activationTaskStats.rewardMin && !activationTaskStats.rewardMax
+                        ? `不少于 ${activationTaskStats.rewardMin}U`
+                        : !activationTaskStats.rewardMin && activationTaskStats.rewardMax
+                          ? `不超过 ${activationTaskStats.rewardMax}U`
+                          : '1U-100U'}
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <div className="text-xs text-muted-foreground">管理员USDT收款地址（BSC网络）</div>
+                {developerAddress ? (
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 p-2 rounded-md bg-background/60 border border-border font-mono text-xs break-all">
+                      {developerAddress}
+                    </div>
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="outline"
+                      onClick={handleCopyDeveloperAddress}
+                    >
+                      复制地址
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="text-xs text-red-500">
+                    管理员尚未配置收款地址，请先联系管理员确认后再打款。
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2 rounded-md border border-purple-200/70 bg-purple-50/70 p-3 text-xs sm:text-sm text-purple-900">
+                <div className="font-semibold">激活与闯关步骤</div>
+                <ol className="list-decimal list-inside space-y-1 leading-relaxed">
+                  <li>根据任务说明联系管理员，按照指示支付约 30U-100U 的激活资金，用于锁定本次游戏任务名额。</li>
+                  <li>完成打款后，请保留转账截图或凭证，稍后在“我的任务”中上传。</li>
+                  <li>按照任务说明在指定平台完成对应的游戏或交互操作，视为闯关过程。</li>
+                  <li>闯关完成后，前往下方“我的任务”，点击对应任务右侧的“提交交付信息”，上传打款截图和任务完成证明，并填写收款钱包地址。</li>
+                  <li>管理员审核通过后，将返还激活本金，并按完成情况发放相应的任务奖励。</li>
+                </ol>
+              </div>
+              <div className="space-y-1 text-xs text-muted-foreground">
+                <div>提示：请勿在任何聊天或网站中泄露钱包私钥或助记词。</div>
+                <div>如对任务规则存在疑问，请优先联系平台管理员确认后再操作。</div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setActivationDialogOpen(false);
+                    setActivationTask(null);
+                  }}
+                >
+                  稍后再看
+                </Button>
+                <Button
+                  onClick={() => {
+                    setActivationDialogOpen(false);
+                    setActivationTask(null);
+                    const el = document.getElementById('my-tasks-card');
+                    if (el) {
+                      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                  }}
+                >
+                  我已了解，去准备打款
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={gameDialogOpen}
+        onOpenChange={(open) => {
+          setGameDialogOpen(open);
+          if (!open) {
+            setGameClaim(null);
+            setGameStep(1);
+          }
+        }}
+      >
+        <DialogContent className="max-w-xl sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>游戏任务闯关</DialogTitle>
+            <DialogDescription>
+              按照关卡提示完成操作，通关后提交交付信息即可领取奖励。
+            </DialogDescription>
+          </DialogHeader>
+          {gameClaim && (
+            <div className="space-y-4 text-sm leading-relaxed">
+              <div className="space-y-1">
+                <div className="text-xs text-muted-foreground">当前任务</div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="font-semibold">{getTaskTitle(gameClaim.task_id)}</div>
+                  {(() => {
+                    const task = taskMap.get(gameClaim.task_id);
+                    if (!task) return null;
+                    const isGameTask =
+                      task.is_game_task === true ||
+                      (!!task.description && task.description.startsWith('【游戏化任务｜'));
+                    if (!isGameTask) return null;
+                    let difficultyLabel: string | null = null;
+                    if (task.game_difficulty === 'high') difficultyLabel = '高';
+                    else if (task.game_difficulty === 'medium') difficultyLabel = '中';
+                    else if (task.game_difficulty === 'low') difficultyLabel = '低';
+                    else if (task.description) {
+                      if (task.description.includes('难度：高')) difficultyLabel = '高';
+                      else if (task.description.includes('难度：中')) difficultyLabel = '中';
+                      else if (task.description.includes('难度：低')) difficultyLabel = '低';
+                    }
+                    return (
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="bg-purple-500/10 text-purple-500 text-[10px] px-1.5 py-0.5">
+                          游戏任务
+                        </Badge>
+                        {difficultyLabel && (
+                          <Badge variant="outline" className="text-xs border-purple-500/40 text-purple-500">
+                            难度：{difficultyLabel}
+                          </Badge>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className={`space-y-2 rounded-md border p-3 ${gameStep === 1 ? 'border-purple-500 bg-purple-50/70' : 'bg-background/80'}`}>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide">第一关</div>
+                  <div className="font-semibold">激活任务与准备</div>
+                  <div className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                    仔细阅读任务说明，联系管理员获取收款方式，并完成约 30U-100U 的激活打款，保存好转账截图或凭证。
+                  </div>
+                </div>
+                <div className={`space-y-2 rounded-md border p-3 ${gameStep === 2 ? 'border-purple-500 bg-purple-50/70' : 'bg-background/80'}`}>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide">第二关</div>
+                  <div className="font-semibold">完成游戏或交互操作</div>
+                  <div className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                    按照任务具体要求，在指定平台完成对应的游戏、交互或链上操作，并记录好相关截图或链接。
+                  </div>
+                </div>
+                <div className={`space-y-2 rounded-md border p-3 ${gameStep === 3 ? 'border-purple-500 bg-purple-50/70' : 'bg-background/80'}`}>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide">第三关</div>
+                  <div className="font-semibold">提交凭证领取奖励</div>
+                  <div className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                    回到“我的任务”，为本任务上传打款截图和任务完成证明，填写收款钱包地址，等待管理员审核发放奖励。
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-1 text-xs text-muted-foreground">
+                <div>提示：通关进度仅在本设备本次访问中记录，最终奖励以管理员审核结果为准。</div>
+                <div>请勿泄露钱包私钥或助记词，仅通过平台指定方式联系管理员。</div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setGameDialogOpen(false);
+                    setGameClaim(null);
+                    setGameStep(1);
+                  }}
+                >
+                  稍后再玩
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (gameStep < 3) {
+                      setGameStep(gameStep + 1);
+                      return;
+                    }
+                    if (gameClaim) {
+                      setGameDialogOpen(false);
+                      setGameStep(1);
+                      openProofDialog(gameClaim);
+                      const el = document.getElementById('my-tasks-card');
+                      if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }
+                    }
+                  }}
+                >
+                  {gameStep === 1 ? '完成第一关' : gameStep === 2 ? '完成第二关' : '完成第三关并提交交付信息'}
                 </Button>
               </div>
             </div>

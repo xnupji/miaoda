@@ -873,6 +873,7 @@ export async function createTaskOrder(
     activationMaxUsdt?: number | null;
     rewardMinUsdt?: number | null;
     rewardMaxUsdt?: number | null;
+    manualFilledCount?: number | null;
   }
 ): Promise<boolean> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -884,6 +885,7 @@ export async function createTaskOrder(
   const activationMaxUsdt = options?.activationMaxUsdt ?? null;
   const rewardMinUsdt = options?.rewardMinUsdt ?? null;
   const rewardMaxUsdt = options?.rewardMaxUsdt ?? null;
+  const manualFilledCount = options?.manualFilledCount ?? 0;
 
   const { error } = await supabase
     .from('task_orders')
@@ -900,6 +902,7 @@ export async function createTaskOrder(
       activation_max_usdt: activationMaxUsdt,
       reward_min_usdt: rewardMinUsdt,
       reward_max_usdt: rewardMaxUsdt,
+      manual_filled_count: manualFilledCount,
       created_by: user.id,
     });
 
@@ -945,6 +948,34 @@ export async function updateTaskOrderStatus(
   return true;
 }
 
+export async function updateTaskOrder(
+  id: string,
+  updates: Partial<TaskOrder>
+): Promise<boolean> {
+  // Convert camelCase to snake_case for DB if needed, but here we assume Partial<TaskOrder> keys match DB or we map them.
+  // Actually TaskOrder keys are mixed camelCase in frontend vs snake_case in DB?
+  // No, TaskOrder in types.ts has snake_case keys for DB fields mostly?
+  // Let's check types.ts again.
+  // types.ts:
+  // activation_min_usdt?: number | null;
+  // So they are snake_case. Good.
+  
+  const { error } = await supabase
+    .from('task_orders')
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id);
+
+  if (error) {
+    console.error('更新抢单任务失败:', error);
+    return false;
+  }
+
+  return true;
+}
+
 export async function getOpenTaskOrders(): Promise<TaskOrder[]> {
   const nowIso = new Date().toISOString();
 
@@ -963,7 +994,7 @@ export async function getOpenTaskOrders(): Promise<TaskOrder[]> {
   return Array.isArray(data) ? data as TaskOrder[] : [];
 }
 
-export async function claimTaskOrder(taskId: string): Promise<{ ok: boolean; error?: string }> {
+export async function claimTaskOrder(taskId: string): Promise<{ ok: boolean; error?: string; claimId?: string }> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: '未登录' };
 
@@ -998,18 +1029,26 @@ export async function claimTaskOrder(taskId: string): Promise<{ ok: boolean; err
     }
 
     const claimsCount = (claimsCountData as any)?.length ?? 0;
-    if (claimsCount >= task.max_claims) {
+    // Count manual filled count as well for limit check if desired, 
+    // but usually manual count is for display. 
+    // If we want manual count to actually block claims, we should include it.
+    // Given "admin adjustment", it likely implies blocking too.
+    const totalFilled = claimsCount + (task.manual_filled_count || 0);
+    
+    if (totalFilled >= task.max_claims) {
       return { ok: false, error: '任务抢单人数已满' };
     }
   }
 
-  const { error } = await supabase
+  const { data: newClaim, error } = await supabase
     .from('task_order_claims')
     .insert({
       task_id: taskId,
       user_id: user.id,
       status: 'claimed',
-    });
+    })
+    .select('id')
+    .single();
 
   if (error) {
     if (error.code === '23505') {
@@ -1019,7 +1058,7 @@ export async function claimTaskOrder(taskId: string): Promise<{ ok: boolean; err
     return { ok: false, error: '抢单失败，请稍后重试' };
   }
 
-  return { ok: true };
+  return { ok: true, claimId: newClaim.id };
 }
 
 export async function submitTaskOrderProof(
